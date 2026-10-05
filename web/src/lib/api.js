@@ -90,9 +90,9 @@ export const kissBt = {
   bondedDevices: () => api.get('/kiss/bonded-bt-devices'),
 };
 
-// kissBle groups the BLE TNC scanner helpers (desktop only, uses
-// tinygo.org/x/bluetooth; returns 501 on Android and on macOS release
-// builds compiled without CGO).
+// kissBle groups the BLE KISS TNC scanner helpers. Android routes scans
+// through the native platform bridge; desktop uses the native BLE backend.
+// Unsupported builds return 501.
 export const kissBle = {
   // openScan opens a Server-Sent Events stream that delivers discovered
   // BLE TNC devices (Mobilinkd TNC3/TNC4, BTECH UV-PRO, VERO VR-N76,
