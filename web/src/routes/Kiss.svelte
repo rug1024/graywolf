@@ -1614,11 +1614,29 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
   }
   .bt-picker :global(select),
   .bt-picker :global(input) {
     margin: 0 !important;
     flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* On narrow phones the device name/MAC in the BLE picker can be much
+     wider than the available modal width. Stack the picker and action button
+     instead of allowing the row to push the modal past the viewport. */
+  @media (max-width: 480px) {
+    .bt-picker {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .bt-picker :global(button) {
+      width: 100%;
+    }
+    .needs-reconfig-banner {
+      flex-wrap: wrap;
+    }
   }
   /* Grant-permission button row sits below the bt-picker; the small
      top margin separates it from the picker without making the
