@@ -12,6 +12,7 @@ on:
   push:
     branches:
       - main
+      - ble-kiss-tbeam # temporary fork validation; removed after the test run
     tags:
       - 'v*'
   pull_request:
