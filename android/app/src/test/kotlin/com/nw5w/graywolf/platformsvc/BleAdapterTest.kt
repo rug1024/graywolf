@@ -7,6 +7,7 @@ import com.nw5w.graywolf.platformproto.SerialClose
 import com.nw5w.graywolf.platformproto.SerialData
 import com.nw5w.graywolf.platformproto.SerialKind
 import com.nw5w.graywolf.platformproto.SerialOpen
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
