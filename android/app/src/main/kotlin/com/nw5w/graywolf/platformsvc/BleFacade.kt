@@ -185,6 +185,7 @@ class SystemBleGattSession(
     private val writeLock = java.util.concurrent.locks.ReentrantLock()
     private val writeReady = writeLock.newCondition()
     @Volatile private var writePending = false
+    @Volatile private var writeStatus = BluetoothGatt.GATT_SUCCESS
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
@@ -253,6 +254,7 @@ class SystemBleGattSession(
         ) {
             writeLock.lock()
             try {
+                writeStatus = status
                 writePending = false
                 writeReady.signalAll()
             } finally {
@@ -298,23 +300,39 @@ class SystemBleGattSession(
             rxChar = profile.rx
 
             // Enable notifications on the TX characteristic.
-            try { g.setCharacteristicNotification(profile.tx, true) } catch (e: SecurityException) {
+            val notifyEnabled = try {
+                g.setCharacteristicNotification(profile.tx, true)
+            } catch (e: SecurityException) {
                 g.disconnect(); error("BLE: BLUETOOTH_CONNECT permission denied enabling notify")
             }
+            if (!notifyEnabled) {
+                g.disconnect(); error("BLE: setCharacteristicNotification was rejected")
+            }
+
             val cccdDescriptor = profile.tx.getDescriptor(SystemBleFacade.CCCD)
                 ?: run { g.disconnect(); error("BLE: no CCCD on TX characteristic") }
 
             @Suppress("DEPRECATION")
             cccdDescriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                try { g.writeDescriptor(cccdDescriptor, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE) } catch (e: SecurityException) {
+            val descriptorQueued = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                try {
+                    g.writeDescriptor(
+                        cccdDescriptor,
+                        BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE,
+                    ) == BluetoothStatusCodes.SUCCESS
+                } catch (e: SecurityException) {
                     g.disconnect(); error("BLE: BLUETOOTH_CONNECT permission denied writing CCCD")
                 }
             } else {
                 @Suppress("DEPRECATION")
-                try { g.writeDescriptor(cccdDescriptor) } catch (e: SecurityException) {
+                try {
+                    g.writeDescriptor(cccdDescriptor)
+                } catch (e: SecurityException) {
                     g.disconnect(); error("BLE: BLUETOOTH_CONNECT permission denied writing CCCD")
                 }
+            }
+            if (!descriptorQueued) {
+                g.disconnect(); error("BLE: CCCD write could not be queued")
             }
 
             // Wait for CCCD write to complete (→ onDescriptorWrite → READY).
@@ -397,15 +415,11 @@ class SystemBleGattSession(
             val chunk = bytes.copyOfRange(offset, end)
 
             if (!useWwr) {
-                // Serialize write-with-response: wait for the previous ATT ACK.
+                // Mark this write as pending before queueing it; the callback
+                // clears the flag and records the ATT status.
                 writeLock.lock()
                 try {
-                    val deadline = System.currentTimeMillis() + 5_000L
-                    while (writePending) {
-                        val remaining = deadline - System.currentTimeMillis()
-                        if (remaining <= 0) return
-                        writeReady.await(remaining, java.util.concurrent.TimeUnit.MILLISECONDS)
-                    }
+                    writeStatus = BluetoothGatt.GATT_SUCCESS
                     writePending = true
                 } finally {
                     writeLock.unlock()
@@ -445,7 +459,31 @@ class SystemBleGattSession(
                 }
                 throw IOException("BLE: GATT write could not be queued")
             }
+
+            if (!useWwr) {
+                awaitWriteResponse()
+            }
             offset = end
+        }
+    }
+
+    private fun awaitWriteResponse(timeoutMs: Long = 5_000L) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        writeLock.lock()
+        try {
+            while (writePending) {
+                val remaining = deadline - System.currentTimeMillis()
+                if (remaining <= 0) {
+                    writePending = false
+                    throw IOException("BLE: timed out waiting for GATT write response")
+                }
+                writeReady.await(remaining, java.util.concurrent.TimeUnit.MILLISECONDS)
+            }
+            if (writeStatus != BluetoothGatt.GATT_SUCCESS) {
+                throw IOException("BLE: GATT write failed with status $writeStatus")
+            }
+        } finally {
+            writeLock.unlock()
         }
     }
 
