@@ -102,6 +102,17 @@ func (a *App) wireServices(ctx context.Context) error {
 
 	// --- Configstore ---------------------------------------------------
 	//
+	// Remember whether this is a genuinely new on-disk database before
+	// configstore.Open creates it. Android uses this to seed its synthetic
+	// Default Input/Output rows exactly once. Checking only whether the
+	// audio_devices table is empty would recreate rows that the operator
+	// deliberately deleted on a later boot.
+	configDBFresh := false
+	if platform.Kind == "android" && a.cfg.DBPath != "" {
+		if _, statErr := os.Stat(a.cfg.DBPath); errors.Is(statErr, os.ErrNotExist) {
+			configDBFresh = true
+		}
+	}
 	// Opened synchronously here (not inside the configstore component's
 	// start closure) because every subsequent constructor below reads
 	// from the store. On any later error we close the store before
@@ -237,17 +248,12 @@ func (a *App) wireServicesInner(ctx context.Context) error {
 			plCfg = seeded
 		}
 	}
-	// On Android, seed a single audio_devices row on first boot. The
-	// AudioPump (Kotlin) always captures from the system default mic
-	// regardless of any DB rows -- it's how the modem decodes RF
-	// packets immediately on cold start -- but the SPA's
-	// AudioDevices / Channels pages drive their UX from the
-	// audio_devices table. Without a seed row, an operator who just
-	// launched the app sees "no audio devices" while RF traffic is
-	// already being decoded, which is a confusing failure mode.
-	// Operator can still rename / delete via the SPA; subsequent
-	// boots respect the persisted state.
-	if platform.Kind == "android" {
+	// On a genuinely fresh Android config DB, seed the synthetic
+	// Default Input/Output rows used by the built-in phone audio modem.
+	// Do this only on first database creation. An empty audio_devices
+	// table on a later boot can be an intentional operator choice
+	// (for example a KISS-TNC-only setup), so it must remain empty.
+	if platform.Kind == "android" && configDBFresh {
 		if devs, err := a.store.ListAudioDevices(ctx); err == nil && len(devs) == 0 {
 			// One input row + one output row. AudioPump (Kotlin)
 			// captures from the system default mic and renders to
