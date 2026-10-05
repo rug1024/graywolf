@@ -568,9 +568,9 @@
     bleScanning = false;
   }
 
-  // Phase 6 (Option A scope): prompt the operator to grant
-  // BLUETOOTH_CONNECT via the Android JS bridge, then re-poll the
-  // bonded-device list on success. The lambda is wired through
+  // Ask Android for the Nearby devices permissions used by both Bluetooth
+  // Classic and BLE (BLUETOOTH_CONNECT + BLUETOOTH_SCAN on Android 12+),
+  // then run the requested action on success. The lambda is wired through
   // MainActivity (which owns requestPermissions()); the WebAppInterface
   // method exists only on Android, so the optional-chain on
   // window.GraywolfWebInterface is the desktop guard.
@@ -854,7 +854,7 @@
       case 'serial':         return 'Serial';
       case 'bluetooth':      return 'Bluetooth Serial';
       case 'usbserial':      return 'USB Serial';
-      case 'ble-device':  return 'BLE TNC';
+      case 'ble-device':      return 'BLE TNC';
       default:               return t;
     }
   }
@@ -1291,8 +1291,8 @@
         <Select id="kiss-usb-baud" bind:value={form.baud_rate} options={baudRateOptions} />
       </FormField>
     {:else if form.type === 'ble-device'}
-      <!-- BLE scan: auto-starts when the modal opens; devices appear in
-           the picker in real time as CoreBluetooth / BlueZ discovers them. -->
+      <!-- BLE scan starts explicitly from the Scan button; devices appear in
+           the picker in real time as the platform BLE backend discovers them. -->
       <FormField
         label="Device"
         id="kiss-ble-device"
