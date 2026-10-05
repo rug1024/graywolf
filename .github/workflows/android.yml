@@ -138,6 +138,13 @@ jobs:
           echo "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT:-<unset>}"
           ls -1 "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/" | grep -E "^(x86_64|aarch64)-linux-android[0-9]+-clang$" | sort
 
+      - name: Run Android unit tests
+        working-directory: android
+        # Keep the Kotlin/platform bridge tests live in CI. assembleDebug does
+        # not compile src/test, so BLE/GPS adapter regressions would otherwise
+        # be invisible until a developer runs Gradle tests locally.
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+
       - name: Build debug APK
         working-directory: android
         # Do NOT use `env: ANDROID_NDK_ROOT: ${{ env.ANDROID_NDK_HOME }}`
