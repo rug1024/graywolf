@@ -500,10 +500,22 @@
   }
 
   // startBLEScan opens an SSE stream to /api/kiss/ble-device-scan.
-  // Devices appear in bleDevices in real time as BLE discovers
-  // them. The stream auto-closes after the server-side timeout (15 s).
-  // The operator can also close it early via stopBLEScan().
+  // On Android 12+ the native BLE scanner requires the Nearby devices
+  // runtime permission (BLUETOOTH_SCAN); use the same bridge as classic
+  // Bluetooth before opening the SSE stream. MainActivity short-circuits
+  // immediately when the permission is already granted.
   function startBLEScan() {
+    if (Platform.isAndroid && globalThis.GraywolfWebInterface?.requestBluetoothPermission) {
+      requestBtPerm(
+        openBLEScan,
+        () => { bleError = 'Nearby devices permission is required to scan for BLE TNCs.'; },
+      );
+      return;
+    }
+    openBLEScan();
+  }
+
+  function openBLEScan() {
     stopBLEScan(); // close any lingering source first
     bleDevices = [];
     bleError = '';
@@ -574,8 +586,11 @@
   // That would require a new state on the backend response and a
   // signal up through the supervisor; it's deferred as a future
   // enhancement.
-  function requestBtPerm() {
-    if (!Platform.isAndroid) return;
+  function requestBtPerm(onGranted = loadBondedDevices, onDenied = undefined) {
+    if (!Platform.isAndroid) {
+      onGranted?.();
+      return;
+    }
     if (!globalThis.GraywolfWebInterface?.requestBluetoothPermission) return;
     // Prefix guarantees a non-empty alphanumeric id even if Math.random()
     // returns 0 — same callback-id pattern the Android USB-grant flow uses.
@@ -584,10 +599,11 @@
     globalThis.__btResult = (id, granted) => {
       if (id !== callbackId) return;
       // One-shot: restore (or clear) the previous handler so a stale
-      // callback fired after we tear down can't refire loadBondedDevices.
+      // callback fired after we tear down can't trigger the wrong action.
       if (prev) globalThis.__btResult = prev;
       else delete globalThis.__btResult;
-      if (granted) loadBondedDevices();
+      if (granted) onGranted?.();
+      else onDenied?.();
     };
     try {
       globalThis.GraywolfWebInterface.requestBluetoothPermission(callbackId);
