@@ -16,6 +16,7 @@ import com.nw5w.graywolf.platformproto.SerialOpen
 import com.nw5w.graywolf.platformproto.SerialOpenAck
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -23,6 +24,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -50,6 +53,8 @@ class BleAdapter(
         val mac: String,
         val session: BleGattSession,
         val readJob: Job,
+        // KISS is a byte stream: concurrent writes must never interleave.
+        val writeMutex: Mutex = Mutex(),
     )
 
     // -----------------------------------------------------------------------
@@ -134,8 +139,12 @@ class BleAdapter(
                 return@launch
             }
 
-            val readJob = scope.launch { readPump(handle, session) }
+            // Install the handle before starting the read pump. A peripheral
+            // can disconnect immediately after GATT init; starting the pump first
+            // leaves a tiny race where closeQuietly() cannot find the handle.
+            val readJob = scope.launch(start = CoroutineStart.LAZY) { readPump(handle, session) }
             handles[handle] = HandleState(mac, session, readJob)
+            readJob.start()
             sendAck(handle, ok = true, err = "")
         }
     }
@@ -145,11 +154,13 @@ class BleAdapter(
         val state = handles[handle] ?: return
         val bytes = req.data.toByteArray()
         scope.launch {
-            try {
-                state.session.write(bytes)
-            } catch (e: Exception) {
-                sendError(handle, "io_error", e.message ?: "")
-                closeQuietly(handle, "write failed")
+            state.writeMutex.withLock {
+                try {
+                    state.session.write(bytes)
+                } catch (e: Exception) {
+                    sendError(handle, "io_error", e.message ?: "")
+                    closeQuietly(handle, "write failed")
+                }
             }
         }
     }
@@ -170,7 +181,13 @@ class BleAdapter(
     // -----------------------------------------------------------------------
 
     private suspend fun readPump(handle: UInt, session: BleGattSession) {
-        val ch = kotlinx.coroutines.channels.Channel<ByteArray>(64)
+        // Never silently drop BLE notification chunks: losing even one byte can
+        // corrupt KISS framing until the next FEND. BLE throughput is bounded and
+        // the downstream UDS consumer is local, so an unbounded channel is safer
+        // here than a fixed buffer with trySend() drops.
+        val ch = kotlinx.coroutines.channels.Channel<ByteArray>(
+            kotlinx.coroutines.channels.Channel.UNLIMITED
+        )
         session.onData { bytes -> ch.trySend(bytes) }
         // Closing ch causes the for-loop below to exit → closeQuietly sends SerialClose
         // to Go → Read() returns io.EOF → SerialSupervisor reconnects automatically.
