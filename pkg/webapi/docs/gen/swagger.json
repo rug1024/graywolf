@@ -4008,7 +4008,7 @@
                 "tags": [
                     "kiss"
                 ],
-                "summary": "Scan for Mobilinkd BLE TNC devices (desktop only)",
+                "summary": "Scan for BLE KISS TNC devices",
                 "operationId": "scanBLEMobilinkd",
                 "parameters": [
                     {
@@ -4020,7 +4020,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "SSE stream of BLEMobilinkdDevice objects"
+                        "description": "SSE stream of BLEDevice objects"
                     },
                     "409": {
                         "description": "scan already in progress",
