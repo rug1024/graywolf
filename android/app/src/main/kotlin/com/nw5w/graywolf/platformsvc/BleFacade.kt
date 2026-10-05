@@ -175,6 +175,9 @@ class SystemBleGattSession(
     private var rxChar: BluetoothGattCharacteristic? = null
     @Volatile private var dataCallback: ((ByteArray) -> Unit)? = null
     @Volatile private var disconnectCallback: (() -> Unit)? = null
+    // ATT payload is negotiated MTU minus the 3-byte ATT header. Start at the
+    // mandatory BLE minimum (23 - 3) and update it in onMtuChanged().
+    @Volatile private var attPayloadSize: Int = 20
 
     // Write serialization: BLE does not allow concurrent characteristic writes.
     private val writeLock = java.util.concurrent.locks.ReentrantLock()
@@ -237,7 +240,7 @@ class SystemBleGattSession(
 
         @Suppress("DEPRECATION")
         override fun onDescriptorWrite(g: BluetoothGatt, descriptor: BluetoothGattDescriptor, status: Int) {
-            setState(State.READY)
+            setState(if (status == BluetoothGatt.GATT_SUCCESS) State.READY else State.FAILED)
             signal()
         }
 
@@ -256,7 +259,14 @@ class SystemBleGattSession(
         }
 
         override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
-            // MTU response received; proceed with service discovery.
+            // Use the actually negotiated MTU rather than assuming a 247-byte
+            // link. Some BLE TNCs negotiate smaller values; hard-coding 244-byte
+            // writes then fails even though the GATT connection itself is healthy.
+            if (status == BluetoothGatt.GATT_SUCCESS && mtu >= 23) {
+                attPayloadSize = maxOf(20, mtu - 3)
+            }
+            // MTU response received (success or failure); service discovery can
+            // continue. On failure we retain the safe 20-byte default.
             g.discoverServices()
         }
     }
@@ -374,10 +384,10 @@ class SystemBleGattSession(
         // on API < 33, so writePending would never clear and every subsequent chunk
         // would stall for 5 s then be dropped.
         val useWwr = rc.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0
-        val mtu = 244
+        val chunkSize = attPayloadSize
         var offset = 0
         while (offset < bytes.size) {
-            val end = minOf(offset + mtu, bytes.size)
+            val end = minOf(offset + chunkSize, bytes.size)
             val chunk = bytes.copyOfRange(offset, end)
 
             if (!useWwr) {
