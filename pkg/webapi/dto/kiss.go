@@ -98,7 +98,7 @@ const (
 
 func (r KissRequest) Validate() error {
 	if !configstore.ValidKissInterfaceType(r.Type) {
-		return fmt.Errorf("type must be tcp, tcp-client, serial, bluetooth, or usbserial")
+		return fmt.Errorf("type must be tcp, tcp-client, serial, bluetooth, usbserial, or ble-device")
 	}
 	if r.Type == configstore.KissTypeTCP && r.TcpPort <= 0 {
 		return fmt.Errorf("tcp_port is required for tcp interfaces")
@@ -122,14 +122,15 @@ func (r KissRequest) Validate() error {
 			return fmt.Errorf("reconnect_init_ms %d must be <= reconnect_max_ms %d", r.ReconnectInitMs, r.ReconnectMaxMs)
 		}
 	}
-	if (r.Type == configstore.KissTypeSerial || r.Type == configstore.KissTypeBluetooth || r.Type == configstore.KissTypeUsbSerial) && r.SerialDevice == "" {
-		return fmt.Errorf("serial_device is required for serial/bluetooth/usbserial interfaces")
+	if (r.Type == configstore.KissTypeSerial ||
+		r.Type == configstore.KissTypeBluetooth ||
+		r.Type == configstore.KissTypeUsbSerial ||
+		r.Type == configstore.KissTypeBLEDevice) && r.SerialDevice == "" {
+		return fmt.Errorf("serial_device is required for serial/bluetooth/usbserial/ble-device interfaces")
 	}
-	// ble-device: serial_device holds the BLE peripheral address, which
-	// is populated after the operator scans and picks a device. An empty
-	// device is accepted at create time; the manager skips rows with no
-	// device when starting. The supervisor will connect once the device
-	// address is saved via a subsequent PUT.
+	// ble-device stores the selected BLE peripheral address in serial_device.
+	// Requiring it at the API boundary mirrors the UI guard and prevents a
+	// persisted enabled interface that can never connect.
 	// Bluetooth/RFCOMM has no baud rate (the radio link runs at its
 	// own modulation rate), so the BaudRate check only applies to
 	// real serial devices. wiring.go hardcodes BaudRate=0 for the
