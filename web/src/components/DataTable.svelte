@@ -67,6 +67,8 @@
                     <Button
                       size="sm"
                       variant={action.variant ?? 'ghost'}
+                      title={action.title ?? ''}
+                      aria-label={action.icon && action.title ? action.title : undefined}
                       disabled={action.disabled ? action.disabled(row) : false}
                       onclick={() => action.onClick(row)}
                     >{action.icon ?? action.title ?? ''}</Button>
