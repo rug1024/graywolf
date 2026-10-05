@@ -13,6 +13,7 @@
   import { channelsStore, start as startChannelsStore, invalidate as refreshChannels, getChannel as lookupChannel } from '../lib/stores/channels.svelte.js';
   import { txPredicate, TX_REASON_FALLBACK } from '../lib/channelBacking.js';
   import { isStationCallsignMissing } from '../lib/callsign.js';
+  import { CUSTOM_IGATE_SERVER, IGATE_SERVER_OPTIONS, igateServerSelection, nextIgateServerState } from '../lib/igateServer.js';
 
   let activeTab = $state('config');
 
@@ -21,12 +22,24 @@
   // Phase 3B removed them from the iGate DTO, and the PUT decoder uses
   // DisallowUnknownFields so sending them triggers a 400.
   let form = $state({
-    enabled: false, server: 'rotate.aprs2.net', port: '14580',
+    enabled: true, server: 'rotate.aprs2.net', port: '14580',
     server_filter: '', tx_channel: 0,
     simulation_mode: false, gate_rf_to_is: true, gate_is_to_rf: false,
     rf_channel: 0, is_tx_via: '', software_name: 'graywolf', software_version: '0.1',
   });
   let loading = $state(false);
+  let serverSelection = $state('rotate.aprs2.net');
+  let customServer = $state('');
+
+  function handleServerSelection(next) {
+    const state = nextIgateServerState(
+      { selection: serverSelection, server: form.server, customServer },
+      next
+    );
+    serverSelection = state.selection;
+    form.server = state.server;
+    customServer = state.customServer;
+  }
 
   // Last-persisted config body. The master Enable toggle auto-saves
   // against this snapshot (see autoSaveEnabled) so flipping it never
@@ -359,28 +372,26 @@
         }
       })(),
       (async () => {
-        try {
-          const data = await api.get('/igate/config');
-          loadedServerFilter = data.server_filter ?? '';
-          form = {
-            enabled: data.enabled ?? false,
-            server: data.server,
-            port: String(data.port),
-            server_filter: data.server_filter ?? '',
-            tx_channel: data.tx_channel ?? 0,
-            simulation_mode: data.simulation_mode ?? false,
-            gate_rf_to_is: data.gate_rf_to_is ?? true,
-            gate_is_to_rf: data.gate_is_to_rf ?? false,
-            rf_channel: data.rf_channel,
-            is_tx_via: data.is_tx_via ?? '',
-            software_name: data.software_name,
-            software_version: data.software_version,
-          };
-          savedConfig = buildBody();
-          filters = await api.get('/igate/filters') || [];
-        } catch (err) {
-          toasts.error('Failed to load iGate config: ' + (err.message || 'unknown error'));
-        }
+        const data = await api.get('/igate/config');
+        loadedServerFilter = data.server_filter ?? '';
+        form = {
+          enabled: data.enabled ?? false,
+          server: data.server,
+          port: String(data.port),
+          server_filter: data.server_filter ?? '',
+          tx_channel: data.tx_channel ?? 0,
+          simulation_mode: data.simulation_mode ?? false,
+          gate_rf_to_is: data.gate_rf_to_is ?? true,
+          gate_is_to_rf: data.gate_is_to_rf ?? false,
+          rf_channel: data.rf_channel,
+          is_tx_via: data.is_tx_via ?? '',
+          software_name: data.software_name,
+          software_version: data.software_version,
+        };
+        serverSelection = igateServerSelection(form.server);
+        customServer = serverSelection === CUSTOM_IGATE_SERVER ? form.server : '';
+        savedConfig = buildBody();
+        filters = await api.get('/igate/filters') || [];
       })(),
     ]);
   });
@@ -466,14 +477,12 @@
   function handleEnableToggleClick(e) {
     if (stationCallsignMissing && !form.enabled) {
       e.preventDefault();
-      toasts.error('Station callsign not set — visit the Station Callsign page before enabling the iGate.');
     }
   }
   function handleEnableToggleKeydown(e) {
     if (!stationCallsignMissing || form.enabled) return;
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
-      toasts.error('Station callsign not set — visit the Station Callsign page before enabling the iGate.');
     }
   }
 
@@ -486,11 +495,9 @@
     // Absorb the programmatic revert (next already matches saved) and
     // guard against re-entrancy while a save is in flight.
     if (!savedConfig || next === savedConfig.enabled || enableSaving) return;
-    // Mirror server-side logic: only block when tx_channel is being *changed*
-    // to a non-TX-capable value. An unchanged tx_channel is allowed even when
-    // not currently TX-capable (server skips the check too — idempotent pass-through).
-    const txChannelChanged = parseInt(form.tx_channel) !== (savedConfig?.tx_channel ?? 0);
-    if (next && txBlock && txChannelChanged) {
+    // Preserve the disabled-Save safety: never auto-enable onto a
+    // non-TX-capable channel. Disabling is always allowed.
+    if (next && txBlock) {
       form.enabled = savedConfig.enabled;
       toasts.error(`Cannot enable iGate: TX channel not TX-capable — ${txBlock.reason}.`);
       return;
@@ -732,8 +739,18 @@
       />
       <div style="margin-top: 16px;">
         <FormField label="APRS-IS Server" id="ig-server">
-          <Input id="ig-server" bind:value={form.server} placeholder="rotate.aprs2.net" />
+          <Select
+            id="ig-server"
+            value={serverSelection}
+            options={IGATE_SERVER_OPTIONS}
+            onValueChange={handleServerSelection}
+          />
         </FormField>
+        {#if serverSelection === CUSTOM_IGATE_SERVER}
+          <FormField label="Custom APRS-IS Server" id="ig-server-custom">
+            <Input id="ig-server-custom" bind:value={form.server} placeholder="rotate.aprs2.net" />
+          </FormField>
+        {/if}
         <FormField label="Port" id="ig-port">
           <Input id="ig-port" bind:value={form.port} type="number" placeholder="14580" />
         </FormField>
