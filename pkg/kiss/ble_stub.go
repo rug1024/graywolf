@@ -1,7 +1,7 @@
 //go:build !android && !linux && !cgo
 
 // Stub for platforms that cannot support BLE KISS:
-//   - Android: use Bluetooth Serial (SPP/RFCOMM) instead.
+//   - Android is handled by ble_android.go and the Kotlin platform bridge.
 //   - macOS/Windows without CGO: CoreBluetooth/WinRT requires CGO; rebuild
 //     the binary with CGO_ENABLED=1 to enable BLE support.
 package kiss
