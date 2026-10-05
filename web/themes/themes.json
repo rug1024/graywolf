@@ -12,6 +12,16 @@
       "description": "Dark variant of the default palette. Easier on the eyes after sunset."
     },
     {
+      "id": "signal",
+      "name": "Signal",
+      "description": "A more colorful light palette with blue, teal, violet, and distinct packet-status hues."
+    },
+    {
+      "id": "signal-night",
+      "name": "Signal Night",
+      "description": "Dark companion to Signal with vivid radio-status colors on restrained navy surfaces."
+    },
+    {
       "id": "grayscale",
       "name": "Grayscale",
       "description": "Light, monochrome. No chromatic accents."
