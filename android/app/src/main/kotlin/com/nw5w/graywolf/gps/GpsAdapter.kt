@@ -10,6 +10,7 @@ import android.location.LocationManager
 import android.location.altitude.AltitudeConverter
 import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.nw5w.graywolf.platformproto.GnssStatusUpdate
 import com.nw5w.graywolf.platformproto.GpsFix
@@ -205,6 +206,7 @@ class GpsAdapter(
      * AltitudeConverter class. One converter instance retains its local geoid
      * cache across fixes.
      */
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     private object Api34AltitudeConverter {
         private val converter by lazy { AltitudeConverter() }
 
