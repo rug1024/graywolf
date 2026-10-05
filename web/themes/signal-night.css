@@ -1,0 +1,79 @@
+/*
+ * Signal Night -- dark companion to Signal. The background stays restrained
+ * while controls, status states and packet types use brighter blue/teal/violet
+ * accents that remain readable in low light.
+ */
+:root:root[data-theme="signal-night"] {
+  --color-bg: #090d18;
+  --color-surface: #111827;
+  --color-surface-raised: #172033;
+  --color-border: #334155;
+  --color-border-subtle: #243044;
+  --color-text: #e5e7eb;
+  --color-text-muted: #a8b3c5;
+  --color-text-dim: #7c8aa0;
+  --color-text-inverse: #08111f;
+
+  --color-primary: #60a5fa;
+  --color-primary-hover: #93c5fd;
+  --color-primary-muted: rgba(96, 165, 250, 0.18);
+  --color-primary-fg: #08111f;
+  --color-accent: #34d399;
+
+  --color-danger: #fb7185;
+  --color-danger-hover: #fda4af;
+  --color-danger-muted: rgba(251, 113, 133, 0.17);
+  --color-danger-fg: #08111f;
+  --color-success: #34d399;
+  --color-success-fill: #34d399;
+  --color-success-muted: rgba(52, 211, 153, 0.17);
+  --color-success-fg: #08111f;
+  --color-warning: #fbbf24;
+  --color-warning-muted: rgba(251, 191, 36, 0.18);
+  --color-warning-fg: #08111f;
+  --color-info: #67e8f9;
+  --color-info-muted: rgba(103, 232, 249, 0.16);
+  --color-info-fg: #08111f;
+
+  --color-btn-bg: #172033;
+  --color-btn-bg-hover: #22304a;
+  --color-btn-border: #334155;
+  --font-mono: 'Inconsolata', 'Courier New', monospace;
+  --radius: 6px;
+
+  --map-overlay-bg: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  --map-overlay-blur: 10px;
+  --map-overlay-fg: var(--color-text);
+  --map-overlay-muted: var(--color-text-muted);
+  --map-overlay-border: var(--color-border);
+  --map-overlay-shadow: 0 4px 18px rgba(0, 0, 0, 0.58);
+  --map-attribution-bg: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  --map-temp-fg: #f8fafc;
+  --map-temp-bg: rgba(4, 8, 18, 0.86);
+  --map-temp-border: rgba(255, 255, 255, 0.48);
+}
+
+:root[data-theme="signal-night"] .badge-success { background: rgba(52, 211, 153, 0.18); color: #6ee7b7; border-color: rgba(52, 211, 153, 0.42); }
+:root[data-theme="signal-night"] .badge-warning { background: rgba(251, 191, 36, 0.18); color: #fcd34d; border-color: rgba(251, 191, 36, 0.42); }
+:root[data-theme="signal-night"] .badge-danger  { background: rgba(251, 113, 133, 0.18); color: #fda4af; border-color: rgba(251, 113, 133, 0.42); }
+:root[data-theme="signal-night"] .badge-info    { background: rgba(103, 232, 249, 0.16); color: #67e8f9; border-color: rgba(103, 232, 249, 0.40); }
+
+:root[data-theme="signal-night"] .pkt-b-type[data-type='position']     { background: rgba(96, 165, 250, 0.18);  color: #93c5fd; }
+:root[data-theme="signal-night"] .pkt-b-type[data-type='weather']      { background: rgba(52, 211, 153, 0.17);  color: #6ee7b7; }
+:root[data-theme="signal-night"] .pkt-b-type[data-type='telemetry']    { background: rgba(251, 191, 36, 0.18);  color: #fcd34d; }
+:root[data-theme="signal-night"] .pkt-b-type[data-type='message']      { background: rgba(103, 232, 249, 0.16); color: #67e8f9; }
+:root[data-theme="signal-night"] .pkt-b-type[data-type='object']       { background: rgba(167, 139, 250, 0.18); color: #c4b5fd; }
+:root[data-theme="signal-night"] .pkt-b-type[data-type='item']         { background: rgba(74, 222, 128, 0.16);  color: #86efac; }
+:root[data-theme="signal-night"] .pkt-b-type[data-type='mic-e']        { background: rgba(244, 114, 182, 0.18); color: #f9a8d4; }
+:root[data-theme="signal-night"] .pkt-b-type[data-type='status']       { background: rgba(148, 163, 184, 0.16); color: #cbd5e1; }
+:root[data-theme="signal-night"] .pkt-b-type[data-type='capabilities'] { background: rgba(196, 181, 253, 0.16); color: #ddd6fe; }
+:root[data-theme="signal-night"] .pkt-b-type[data-type='df-report'],
+:root[data-theme="signal-night"] .pkt-b-type[data-type='query']        { background: rgba(251, 146, 60, 0.18);  color: #fdba74; }
+:root[data-theme="signal-night"] .pkt-b-type[data-type='third-party'],
+:root[data-theme="signal-night"] .pkt-b-type[data-type='unknown']      { background: rgba(148, 163, 184, 0.14); color: #cbd5e1; }
+
+:root[data-theme="signal-night"] .pkt-b-origin[data-origin='bcn']          { background: rgba(251, 146, 60, 0.18);  color: #fdba74; }
+:root[data-theme="signal-night"] .pkt-b-origin[data-origin='digi']         { background: rgba(96, 165, 250, 0.18);  color: #93c5fd; }
+:root[data-theme="signal-night"] .pkt-b-origin[data-origin='igate'],
+:root[data-theme="signal-night"] .pkt-b-origin[data-origin='igate-is2rf'],
+:root[data-theme="signal-night"] .pkt-b-origin[data-origin='igate-rf2is'] { background: rgba(167, 139, 250, 0.18); color: #c4b5fd; }
