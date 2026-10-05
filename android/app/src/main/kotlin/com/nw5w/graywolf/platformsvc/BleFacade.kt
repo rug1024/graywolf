@@ -209,6 +209,7 @@ class SystemBleGattSession(
                 else -> {
                     val wasReady = state == State.READY
                     if (state != State.CLOSED) setState(State.FAILED)
+                    failPendingWrite(status)
                     if (wasReady) disconnectCallback?.invoke()
                     signal()
                     // Release the GATT client slot immediately so future connect
@@ -467,6 +468,17 @@ class SystemBleGattSession(
         }
     }
 
+    private fun failPendingWrite(status: Int = BluetoothGatt.GATT_FAILURE) {
+        writeLock.lock()
+        try {
+            writeStatus = status
+            writePending = false
+            writeReady.signalAll()
+        } finally {
+            writeLock.unlock()
+        }
+    }
+
     private fun awaitWriteResponse(timeoutMs: Long = 5_000L) {
         val deadline = System.currentTimeMillis() + timeoutMs
         writeLock.lock()
@@ -490,6 +502,7 @@ class SystemBleGattSession(
     override fun close() {
         setState(State.CLOSED)
         signal()
+        failPendingWrite()
         dataCallback = null
         disconnectCallback = null
         // disconnect() before close() per Android docs; close() alone leaves the
