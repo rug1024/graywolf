@@ -19,6 +19,7 @@ import com.nw5w.graywolf.platformproto.SatInfo
 import com.nw5w.graywolf.platformsvc.PlatformServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
@@ -52,6 +53,7 @@ class GpsAdapter(
     // Android 14+ provides the platform AltitudeConverter; run it off the main
     // thread because its first geoid-model load may take several seconds.
     // Serial execution also prevents an older fix from overtaking a newer one.
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val altitudeScope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO.limitedParallelism(1)
     )

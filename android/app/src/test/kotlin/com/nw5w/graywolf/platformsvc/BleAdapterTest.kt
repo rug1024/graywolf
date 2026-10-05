@@ -17,6 +17,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.mockito.Mockito.mock
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class BleAdapterTest {
     @Test fun scanRequest_forwardsDiscoveredDevice() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)

@@ -56,7 +56,8 @@ class SystemBleFacade(
 ) : BleFacade {
 
     companion object {
-        // Mobilinkd TNC3/TNC4 proprietary GATT service / characteristics.
+        // APRS.fi-compatible BLE KISS GATT profile. Used by Mobilinkd TNC3/TNC4
+        // and compatible firmware such as KJ7NYE LoRa FieldOps on the T-Beam 1W.
         val MOBILINKD_SVC: UUID = UUID.fromString("00000001-ba2a-46c9-ae49-01b0961f68bb")
         val MOBILINKD_TX:  UUID = UUID.fromString("00000003-ba2a-46c9-ae49-01b0961f68bb")
         val MOBILINKD_RX:  UUID = UUID.fromString("00000002-ba2a-46c9-ae49-01b0961f68bb")
@@ -189,8 +190,8 @@ class SystemBleGattSession(
 
     private val gattCallback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
-            when (newState) {
-                BluetoothGatt.STATE_CONNECTED -> {
+            when {
+                newState == BluetoothGatt.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS -> {
                     setState(State.CONNECTED)
                     // Clear stale GATT service cache, then negotiate MTU before service
                     // discovery: correct BLE order is connect → MTU → discover → CCCD.
@@ -402,8 +403,11 @@ class SystemBleGattSession(
     override fun onDisconnect(cb: () -> Unit) { disconnectCallback = cb }
 
     override fun write(bytes: ByteArray) {
-        val rc = rxChar ?: return
-        val g  = gatt  ?: return
+        if (state != State.READY) {
+            throw IOException("BLE: GATT session is not ready (state=$state)")
+        }
+        val rc = rxChar ?: throw IOException("BLE: RX characteristic is unavailable")
+        val g  = gatt  ?: throw IOException("BLE: GATT session is closed")
         // Prefer write-without-response when the characteristic supports it: no
         // per-chunk ATT round-trip and onCharacteristicWrite does NOT fire for WWR
         // on API < 33, so writePending would never clear and every subsequent chunk
