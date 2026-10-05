@@ -151,7 +151,7 @@ func (a *App) wireServices(ctx context.Context) error {
 		a.logger.Warn("orphan channel-ref scan failed", "err", err)
 	}
 
-	if err := a.wireServicesInner(ctx); err != nil {
+	if err := a.wireServicesInner(ctx, configDBFresh); err != nil {
 		_ = a.store.Close()
 		a.store = nil
 		a.startOrder = nil
@@ -164,7 +164,7 @@ func (a *App) wireServices(ctx context.Context) error {
 // is open. Split out so the outer function can handle its error path
 // with a single defer-like cleanup. Any error here means the outer
 // function closes the store before returning.
-func (a *App) wireServicesInner(ctx context.Context) error {
+func (a *App) wireServicesInner(ctx context.Context, configDBFresh bool) error {
 	// --- FLAC override (optional, mutates the store) -------------------
 	if err := a.applyFlacOverride(ctx); err != nil {
 		return fmt.Errorf("apply flac override: %w", err)
