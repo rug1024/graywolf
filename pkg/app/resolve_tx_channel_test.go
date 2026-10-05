@@ -12,11 +12,12 @@ import (
 )
 
 // TestResolveTxChannel exercises the fallback truth table in
-// (*App).resolveTxChannel: any non-zero configured channel that exists
-// in the DB is returned as-is regardless of backing type; a zero
-// configured value (auto-select) picks the lowest modem-backed channel
-// or, failing that, the lowest channel overall with a warn log; an
-// empty channel list returns the configured value unchanged.
+// (*App).resolveTxChannel: configured-with-modem returns configured;
+// configured-without-modem falls back to the lowest modem-backed
+// channel; configured-not-present falls back the same way; no
+// modem-backed channel returns the lowest channel ID overall and logs
+// the dedicated "tx will fail at submit" warning; an empty channel
+// list returns the configured value unchanged.
 func TestResolveTxChannel(t *testing.T) {
 	ctx := context.Background()
 
@@ -76,11 +77,11 @@ func TestResolveTxChannel(t *testing.T) {
 			wantIdx:       1,
 		},
 		{
-			// KISS-only channels are valid TX targets; honour the operator's choice.
-			name:          "configured channel without modem returns configured",
-			specs:         []channelSpec{{"a", true}, {"b", false}},
-			configuredIdx: 1,
-			wantIdx:       1,
+			name:             "configured channel without modem falls back to lowest with modem",
+			specs:            []channelSpec{{"a", true}, {"b", false}},
+			configuredIdx:    1,
+			wantIdx:          0,
+			wantWarnContains: "no modem backend",
 		},
 		{
 			name:             "configured channel id absent falls back to lowest with modem",
@@ -90,10 +91,9 @@ func TestResolveTxChannel(t *testing.T) {
 			wantWarnContains: "",
 		},
 		{
-			// Auto-select (configured=0) with no modem channels logs 'tx will fail'.
-			name:             "auto-select with no modem channels returns lowest id and warns",
+			name:             "no channel has modem returns lowest id and warns",
 			specs:            []channelSpec{{"a", false}, {"b", false}},
-			configuredIdx:    -1,
+			configuredIdx:    1,
 			wantIdx:          0,
 			wantWarnContains: "tx will fail at submit",
 		},
