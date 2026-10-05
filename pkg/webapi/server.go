@@ -141,8 +141,8 @@ type Server struct {
 	pttDeviceSource PttDeviceSource
 
 	// bleScanner scans for BLE peripherals for GET /api/kiss/ble-device-scan.
-	// Wired post-construction via SetBLEScanner on non-Android builds; nil on
-	// Android so the handler returns 501.
+	// Wired post-construction by pkg/app on Android and supported desktop
+	// builds; nil on builds without a BLE backend, where the handler returns 501.
 	bleScanner BLEScanner
 	// bleRepairer removes the Android bond for a BLE TNC so the next connect
 	// triggers fresh pairing. Wired on Android only; nil elsewhere → 501.
