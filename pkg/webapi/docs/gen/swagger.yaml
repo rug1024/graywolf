@@ -5922,6 +5922,32 @@ paths:
       summary: List attached USB serial devices (Android only)
       tags:
         - kiss
+  /kiss/ble-device-scan:
+    get:
+      operationId: scanBLEMobilinkd
+      parameters:
+        - description: Scan duration in seconds (default 15, max 60)
+          in: query
+          name: timeout
+          type: integer
+      produces:
+        - text/event-stream
+      responses:
+        "200":
+          description: SSE stream of BLEMobilinkdDevice objects
+        "409":
+          description: scan already in progress
+          schema:
+            $ref: '#/definitions/webtypes.ErrorResponse'
+        "501":
+          description: not available on this platform
+          schema:
+            $ref: '#/definitions/webtypes.ErrorResponse'
+      security:
+        - CookieAuth: []
+      summary: Scan for Mobilinkd BLE TNC devices (desktop only)
+      tags:
+        - kiss
   /kiss/bonded-bt-devices:
     get:
       operationId: getBondedBtDevices
