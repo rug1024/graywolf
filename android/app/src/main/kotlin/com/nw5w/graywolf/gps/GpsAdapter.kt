@@ -9,11 +9,18 @@ import android.location.LocationListener
 import android.location.LocationManager
 import android.util.Log
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationCompat
+import androidx.core.location.altitude.AltitudeConverterCompat
 import com.nw5w.graywolf.platformproto.GnssStatusUpdate
 import com.nw5w.graywolf.platformproto.GpsFix
 import com.nw5w.graywolf.platformproto.GpsSource
 import com.nw5w.graywolf.platformproto.SatInfo
 import com.nw5w.graywolf.platformsvc.PlatformServer
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
  * GPS producer: subscribes to the system LocationManager, translates
@@ -38,6 +45,15 @@ class GpsAdapter(
 
     @Volatile private var lastSatCount: Int = 0
     @Volatile private var started: Boolean = false
+
+    // Android Location.altitude is WGS84 ellipsoid height, not "meters above
+    // sea level". In Germany that can be roughly 40-50 m higher than NN/MSL.
+    // Convert off the main thread because AltitudeConverterCompat may load its
+    // geoid model from assets on the first call. Serial execution also prevents
+    // an older fix from overtaking a newer one during that first conversion.
+    private val altitudeScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO.limitedParallelism(1)
+    )
 
     private val locationListener = LocationListener { loc -> onLocation(loc) }
 
@@ -109,19 +125,29 @@ class GpsAdapter(
     }
 
     fun stop() {
-        if (!started) return
+        if (!started) {
+            altitudeScope.cancel()
+            return
+        }
         started = false
         try { locationManager.removeUpdates(locationListener) } catch (_: Throwable) {}
         try { locationManager.unregisterGnssStatusCallback(gnssStatusCallback) } catch (_: Throwable) {}
+        altitudeScope.cancel()
     }
 
-    /** Visible for testing. */
+    /** Visible for testing. Prefers orthometric (MSL/NN) altitude when present. */
     internal fun toGpsFix(loc: Location, satCount: Int): GpsFix {
+        val hasAlt = loc.hasAltitude()
+        val altitudeM = when {
+            LocationCompat.hasMslAltitude(loc) -> LocationCompat.getMslAltitudeMeters(loc)
+            hasAlt -> loc.altitude
+            else -> 0.0
+        }
         return GpsFix.newBuilder()
             .setLat(loc.latitude)
             .setLon(loc.longitude)
-            .setAltM(if (loc.hasAltitude()) loc.altitude else 0.0)
-            .setHasAlt(loc.hasAltitude())
+            .setAltM(altitudeM)
+            .setHasAlt(hasAlt)
             .setSpeedMps(if (loc.hasSpeed()) loc.speed.toDouble() else 0.0)
             .setHasSpeed(loc.hasSpeed())
             .setCourseDeg(if (loc.hasBearing()) loc.bearing.toDouble() else 0.0)
@@ -135,7 +161,28 @@ class GpsAdapter(
     }
 
     private fun onLocation(loc: Location) {
-        server.broadcastGpsFix(toGpsFix(loc, lastSatCount))
+        val satCount = lastSatCount
+
+        // Android 14+ providers may already populate MSL altitude. If they do,
+        // use it immediately. Otherwise convert the WGS84 ellipsoid altitude
+        // with AndroidX's geoid model on a worker thread. A conversion failure
+        // is non-fatal: preserve the raw location as a fallback.
+        if (!loc.hasAltitude() || LocationCompat.hasMslAltitude(loc)) {
+            server.broadcastGpsFix(toGpsFix(loc, satCount))
+            return
+        }
+
+        val converted = Location(loc)
+        altitudeScope.launch {
+            try {
+                AltitudeConverterCompat.addMslAltitudeToLocation(ctx, converted)
+            } catch (t: Throwable) {
+                Log.w(TAG, "MSL altitude conversion failed; using WGS84 ellipsoid altitude", t)
+            }
+            if (started) {
+                server.broadcastGpsFix(toGpsFix(converted, satCount))
+            }
+        }
     }
 
     private fun constellationName(type: Int): String = when (type) {
