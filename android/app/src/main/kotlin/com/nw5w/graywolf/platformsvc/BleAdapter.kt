@@ -182,13 +182,16 @@ class BleAdapter(
 
     private suspend fun readPump(handle: UInt, session: BleGattSession) {
         // Never silently drop BLE notification chunks: losing even one byte can
-        // corrupt KISS framing until the next FEND. BLE throughput is bounded and
-        // the downstream UDS consumer is local, so an unbounded channel is safer
-        // here than a fixed buffer with trySend() drops.
-        val ch = kotlinx.coroutines.channels.Channel<ByteArray>(
-            kotlinx.coroutines.channels.Channel.UNLIMITED
-        )
-        session.onData { bytes -> ch.trySend(bytes) }
+        // corrupt KISS framing until the next FEND. Keep a generous bounded
+        // buffer; if the local Go consumer ever falls behind that far, fail the
+        // link explicitly so SerialSupervisor can reconnect from a clean stream.
+        val ch = kotlinx.coroutines.channels.Channel<ByteArray>(256)
+        session.onData { bytes ->
+            if (ch.trySend(bytes).isFailure) {
+                sendError(handle, "rx_overflow", "BLE receive buffer overflow")
+                ch.close()
+            }
+        }
         // Closing ch causes the for-loop below to exit → closeQuietly sends SerialClose
         // to Go → Read() returns io.EOF → SerialSupervisor reconnects automatically.
         session.onDisconnect { ch.close() }
