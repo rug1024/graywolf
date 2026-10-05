@@ -139,10 +139,20 @@ class BleAdapter(
                 return@launch
             }
 
-            // Install the handle before starting the read pump. A peripheral
-            // can disconnect immediately after GATT init; starting the pump first
-            // leaves a tiny race where closeQuietly() cannot find the handle.
-            val readJob = scope.launch(start = CoroutineStart.LAZY) { readPump(handle, session) }
+            // Register data/disconnect callbacks synchronously before exposing
+            // the handle. If the peripheral drops immediately after GATT init,
+            // the channel closes and the lazily-started pump will observe EOF
+            // once the handle has been installed.
+            val rx = kotlinx.coroutines.channels.Channel<ByteArray>(256)
+            session.onData { bytes ->
+                if (rx.trySend(bytes).isFailure) {
+                    sendError(handle, "rx_overflow", "BLE receive buffer overflow")
+                    rx.close()
+                }
+            }
+            session.onDisconnect { rx.close() }
+
+            val readJob = scope.launch(start = CoroutineStart.LAZY) { readPump(handle, rx) }
             handles[handle] = HandleState(mac, session, readJob)
             readJob.start()
             sendAck(handle, ok = true, err = "")
@@ -180,21 +190,13 @@ class BleAdapter(
     // Internal
     // -----------------------------------------------------------------------
 
-    private suspend fun readPump(handle: UInt, session: BleGattSession) {
-        // Never silently drop BLE notification chunks: losing even one byte can
-        // corrupt KISS framing until the next FEND. Keep a generous bounded
-        // buffer; if the local Go consumer ever falls behind that far, fail the
-        // link explicitly so SerialSupervisor can reconnect from a clean stream.
-        val ch = kotlinx.coroutines.channels.Channel<ByteArray>(256)
-        session.onData { bytes ->
-            if (ch.trySend(bytes).isFailure) {
-                sendError(handle, "rx_overflow", "BLE receive buffer overflow")
-                ch.close()
-            }
-        }
-        // Closing ch causes the for-loop below to exit → closeQuietly sends SerialClose
-        // to Go → Read() returns io.EOF → SerialSupervisor reconnects automatically.
-        session.onDisconnect { ch.close() }
+    private suspend fun readPump(
+        handle: UInt,
+        ch: kotlinx.coroutines.channels.ReceiveChannel<ByteArray>,
+    ) {
+        // Closing ch causes the for-loop below to exit → closeQuietly sends
+        // SerialClose to Go → Read() returns io.EOF → SerialSupervisor
+        // reconnects automatically.
         try {
             for (bytes in ch) {
                 sendMessage(
