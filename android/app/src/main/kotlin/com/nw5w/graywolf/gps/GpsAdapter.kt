@@ -7,10 +7,10 @@ import android.location.GnssStatus
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.location.altitude.AltitudeConverter
+import android.os.Build
 import android.util.Log
 import androidx.core.content.ContextCompat
-import androidx.core.location.LocationCompat
-import androidx.core.location.altitude.AltitudeConverterCompat
 import com.nw5w.graywolf.platformproto.GnssStatusUpdate
 import com.nw5w.graywolf.platformproto.GpsFix
 import com.nw5w.graywolf.platformproto.GpsSource
@@ -48,9 +48,9 @@ class GpsAdapter(
 
     // Android Location.altitude is WGS84 ellipsoid height, not "meters above
     // sea level". In Germany that can be roughly 40-50 m higher than NN/MSL.
-    // Convert off the main thread because AltitudeConverterCompat may load its
-    // geoid model from assets on the first call. Serial execution also prevents
-    // an older fix from overtaking a newer one during that first conversion.
+    // Android 14+ provides the platform AltitudeConverter; run it off the main
+    // thread because its first geoid-model load may take several seconds.
+    // Serial execution also prevents an older fix from overtaking a newer one.
     private val altitudeScope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO.limitedParallelism(1)
     )
@@ -137,10 +137,12 @@ class GpsAdapter(
 
     /** Visible for testing. Prefers orthometric (MSL/NN) altitude when present. */
     internal fun toGpsFix(loc: Location, satCount: Int): GpsFix {
-        val hasAlt = loc.hasAltitude()
+        val hasMslAlt = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+            loc.hasMslAltitude()
+        val hasAlt = hasMslAlt || loc.hasAltitude()
         val altitudeM = when {
-            LocationCompat.hasMslAltitude(loc) -> LocationCompat.getMslAltitudeMeters(loc)
-            hasAlt -> loc.altitude
+            hasMslAlt -> loc.mslAltitudeMeters
+            loc.hasAltitude() -> loc.altitude
             else -> 0.0
         }
         return GpsFix.newBuilder()
@@ -164,10 +166,13 @@ class GpsAdapter(
         val satCount = lastSatCount
 
         // Android 14+ providers may already populate MSL altitude. If they do,
-        // use it immediately. Otherwise convert the WGS84 ellipsoid altitude
-        // with AndroidX's geoid model on a worker thread. A conversion failure
-        // is non-fatal: preserve the raw location as a fallback.
-        if (!loc.hasAltitude() || LocationCompat.hasMslAltitude(loc)) {
+        // use it immediately. On Android 14+ otherwise convert the WGS84
+        // ellipsoid altitude with the platform geoid model on a worker thread.
+        // Older Android releases have no built-in geoid converter, so keep the
+        // raw ellipsoid altitude there rather than shipping a large private model.
+        val canConvertMsl = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+        val alreadyHasMsl = canConvertMsl && loc.hasMslAltitude()
+        if (!loc.hasAltitude() || alreadyHasMsl || !canConvertMsl) {
             server.broadcastGpsFix(toGpsFix(loc, satCount))
             return
         }
@@ -175,7 +180,7 @@ class GpsAdapter(
         val converted = Location(loc)
         altitudeScope.launch {
             try {
-                AltitudeConverterCompat.addMslAltitudeToLocation(ctx, converted)
+                Api34AltitudeConverter.addMslAltitude(ctx, converted)
             } catch (t: Throwable) {
                 Log.w(TAG, "MSL altitude conversion failed; using WGS84 ellipsoid altitude", t)
             }
@@ -193,6 +198,19 @@ class GpsAdapter(
         GnssStatus.CONSTELLATION_QZSS -> "QZSS"
         GnssStatus.CONSTELLATION_SBAS -> "SBAS"
         else -> "UNKNOWN"
+    }
+
+    /**
+     * Isolated so pre-Android-14 devices never initialize the API-34-only
+     * AltitudeConverter class. One converter instance retains its local geoid
+     * cache across fixes.
+     */
+    private object Api34AltitudeConverter {
+        private val converter by lazy { AltitudeConverter() }
+
+        fun addMslAltitude(context: Context, location: Location) {
+            converter.addMslAltitudeToLocation(context, location)
+        }
     }
 
     companion object { private const val TAG = "GpsAdapter" }
