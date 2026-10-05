@@ -215,6 +215,9 @@ func (a *App) wireServicesInner(ctx context.Context) error {
 
 	// --- Station cache (map's last-known-state store) ------------------
 	a.stationCache = stationcache.NewPersistentCache(a.logger)
+	// On Android, inject the platform client into the kiss package so
+	// ScanBLEMobilinkd and OpenBLEMobilinkd can route through the Kotlin BLE bridge.
+	a.injectAndroidBLEClient()
 	plCfg, _ := a.store.GetPositionLogConfig(ctx)
 	// On Android, default the position log to enabled on first boot.
 	// The desktop default (off) protects SD-card-based Pi installs from
@@ -526,11 +529,6 @@ func (a *App) wireServicesInner(ctx context.Context) error {
 		// dispatcher's per-instance instance label already mixes
 		// into the same series when the queues are fanned out.
 		OnTxQueueDrop: a.metrics.ObserveKissClientTxDrop,
-		// Active-client gauge for server-listen interfaces. Manager-owned
-		// on purpose: both dispatch sites (kissComponent boot and
-		// notifyKissManager hot-reload) build their own ServerConfig
-		// literal, and the hot-reload one used to omit this, leaving the
-		// gauge reading 0 forever after any config save (graywolf#548).
 		OnClientChange: func(_ uint32, name string, n int) {
 			a.metrics.SetKissClients(name, n)
 		},
@@ -1456,6 +1454,12 @@ func (a *App) wireHTTP(ctx context.Context) error {
 	// responds 501 Not Implemented (see usbserialsource_default.go).
 	apiSrv.SetUsbSerialSource(a.usbSerialSourceForWebapi())
 
+	// BLE Mobilinkd scanner. Non-Android builds wire a real BLE scan
+	// backed by kiss.ScanBLEMobilinkd (see blesource_desktop.go); Android
+	// returns nil so GET /api/kiss/ble-device-scan responds 501.
+	apiSrv.SetBLEScanner(a.bleDeviceScannerForWebapi())
+	apiSrv.SetBLERepairer(a.bleDeviceRepairerForWebapi())
+
 	// PTT device source for the unified PTT tab. Android returns a
 	// live adapter backed by the platformsvc client (see
 	// pttsource_android.go) so GET /api/ptt/available enumerates
@@ -2066,6 +2070,32 @@ func (a *App) kissComponent() namedComponent {
 						GateTxToIs:          ki.GateTxToIs,
 						OnReload:            a.notifyTxBackendReload,
 						OpenFunc:            a.kissSerialOpenFunc(),
+					})
+					continue
+				case configstore.KissTypeBLEDevice:
+					// BLE KISS to Mobilinkd TNC3/TNC4. No baud rate; always TNC
+					// mode (the device owns the modem and PTT). The peripheral
+					// address (macOS UUID or Linux MAC) lives in ki.Device.
+					// Skip if no address — operator saves first, scans after.
+					if ki.Device == "" {
+						continue
+					}
+					a.kissMgr.StartSerial(ctx, ki.ID, kiss.SerialConfig{
+						Name:                name,
+						Device:              ki.Device,
+						BaudRate:            0,
+						Mode:                kiss.ModeTnc,
+						ChannelMap:          map[uint8]uint32{0: ch},
+						ReconnectInitMs:     5000,
+						ReconnectMaxMs:      5000,
+						Logger:              a.logger,
+						TncIngressRateHz:    ki.TncIngressRateHz,
+						TncIngressBurst:     ki.TncIngressBurst,
+						AllowTxFromGovernor: ki.AllowTxFromGovernor,
+						AllowConnectedMode:  ki.AllowConnectedMode,
+						GateTxToIs:          ki.GateTxToIs,
+						OnReload:            a.notifyTxBackendReload,
+						OpenFunc:            kiss.OpenBLEDevice,
 					})
 					continue
 				default:
