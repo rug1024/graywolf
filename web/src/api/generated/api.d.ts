@@ -921,7 +921,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Scan for Mobilinkd BLE TNC devices (desktop only) */
+        /** Scan for BLE KISS TNC devices */
         get: operations["scanBLEMobilinkd"];
         put?: never;
         post?: never;
@@ -7498,7 +7498,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description SSE stream of BLEMobilinkdDevice objects */
+            /** @description SSE stream of BLEDevice objects */
             200: {
                 headers: {
                     [name: string]: unknown;
