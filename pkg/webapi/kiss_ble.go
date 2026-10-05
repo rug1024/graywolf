@@ -13,8 +13,8 @@ import (
 )
 
 // BLEDevice is one discovered BLE TNC peripheral streamed by
-// GET /api/kiss/ble-device-scan. Covers BLE KISS TNC devices (Mobilinkd, NUS-based) and
-// NUS-based devices (BTECH UV-PRO, VERO VR-N76, Radioddity GA-5WB).
+// GET /api/kiss/ble-device-scan. Covers Mobilinkd-profile and Nordic UART
+// Service (NUS) KISS devices, including the T-Beam firmware tested here.
 type BLEDevice struct {
 	Addr string `json:"addr"`
 	Name string `json:"name"`
@@ -22,16 +22,15 @@ type BLEDevice struct {
 }
 
 // BLEScanner is the narrow interface the SSE scan handler
-// consumes. Non-Android builds wire a real BLE scanner backed by
-// kiss.ScanBLEMobilinkd (see pkg/app/blesource_desktop.go); Android
-// builds leave it nil and the handler returns 501.
+// consumes. Desktop builds use the native BLE backend; Android builds route
+// scanning through the Kotlin platform bridge. Unsupported builds leave it nil
+// and the handler returns 501.
 type BLEScanner interface {
 	Scan(ctx context.Context, discovered func(BLEDevice)) error
 }
 
 // SetBLEScanner installs the BLE scanner post-construction.
-// Called from pkg/app on non-Android builds; nil on Android so the
-// handler responds 501 Not Implemented.
+// Called from pkg/app on platforms with an available BLE backend.
 func (s *Server) SetBLEScanner(sc BLEScanner) {
 	s.bleScanner = sc
 }
@@ -52,21 +51,21 @@ func (s *Server) SetBLERepairer(r BLERepairer) {
 // second request while a scan is active receives 409 Conflict.
 var bleScanMu sync.Mutex
 
-// handleBLEScan streams discovered Mobilinkd TNC3/TNC4 BLE devices
-// as Server-Sent Events. Each discovered peripheral yields a "data:" event
-// with a JSON-encoded BLEMobilinkdDevice object. After the scan timeout a
+// handleBLEScan streams discovered BLE KISS TNC devices as Server-Sent
+// Events. Each discovered peripheral yields a "data:" event with a JSON-encoded
+// BLEDevice object. After the scan timeout a
 // final "event: done" event is sent and the stream closes.
 //
 // Query parameters:
 //
 //	timeout  Duration in seconds (default 15, max 60). Example: ?timeout=10
 //
-// @Summary  Scan for Mobilinkd BLE TNC devices (desktop only)
+// @Summary  Scan for BLE KISS TNC devices
 // @Tags     kiss
 // @ID       scanBLEMobilinkd
 // @Produce  text/event-stream
 // @Param    timeout  query  int  false  "Scan duration in seconds (default 15, max 60)"
-// @Success  200 "SSE stream of BLEMobilinkdDevice objects"
+// @Success  200 "SSE stream of BLEDevice objects"
 // @Failure  409 {object} webtypes.ErrorResponse "scan already in progress"
 // @Failure  501 {object} webtypes.ErrorResponse "not available on this platform"
 // @Security CookieAuth
@@ -74,7 +73,7 @@ var bleScanMu sync.Mutex
 func (s *Server) handleBLEScan(w http.ResponseWriter, r *http.Request) {
 	if s.bleScanner == nil {
 		writeJSON(w, http.StatusNotImplemented, webtypes.ErrorResponse{
-			Error: "BLE scanning is not available on this platform (Android: use Bluetooth Serial; macOS release builds: rebuild with CGO_ENABLED=1)",
+			Error: "BLE scanning is not available on this platform/build",
 		})
 		return
 	}
