@@ -914,6 +914,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/kiss/ble-device-scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scan for Mobilinkd BLE TNC devices (desktop only) */
+        get: operations["scanBLEMobilinkd"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/kiss/bonded-bt-devices": {
         parameters: {
             query?: never;
@@ -7465,6 +7482,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["webtypes.ErrorResponse"];
+                };
+            };
+        };
+    };
+    scanBLEMobilinkd: {
+        parameters: {
+            query?: {
+                /** @description Scan duration in seconds (default 15, max 60) */
+                timeout?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description SSE stream of BLEMobilinkdDevice objects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description scan already in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["webtypes.ErrorResponse"];
+                };
+            };
+            /** @description not available on this platform */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["webtypes.ErrorResponse"];
                 };
             };
         };
