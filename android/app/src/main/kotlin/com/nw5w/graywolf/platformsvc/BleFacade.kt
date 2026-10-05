@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCallback
 import android.bluetooth.BluetoothGattCharacteristic
 import android.bluetooth.BluetoothGattDescriptor
+import android.bluetooth.BluetoothStatusCodes
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanFilter
 import android.bluetooth.le.ScanResult
@@ -14,6 +15,7 @@ import android.content.Context
 import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
+import java.io.IOException
 import java.util.UUID
 
 /** A single BLE KISS TNC device found during a scan. */
@@ -263,7 +265,11 @@ class SystemBleGattSession(
             // link. Some BLE TNCs negotiate smaller values; hard-coding 244-byte
             // writes then fails even though the GATT connection itself is healthy.
             if (status == BluetoothGatt.GATT_SUCCESS && mtu >= 23) {
-                attPayloadSize = maxOf(20, mtu - 3)
+                // Android 14 requests MTU 517. GATT attribute values are capped
+                // at 512 bytes, and Android's robustness guidance recommends
+                // reserving 5 bytes for protocol headers. Keep the standard
+                // 20-byte minimum for an MTU-23 link.
+                attPayloadSize = maxOf(20, minOf(512, mtu - 5))
             }
             // MTU response received (success or failure); service discovery can
             // continue. On failure we retain the safe 20-byte default.
@@ -406,13 +412,13 @@ class SystemBleGattSession(
                 }
             }
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val queued = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 val writeType = if (useWwr) BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
                                 else BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                try { g.writeCharacteristic(rc, chunk, writeType) }
-                catch (_: SecurityException) {
-                    if (!useWwr) { writeLock.lock(); try { writePending = false; writeReady.signalAll() } finally { writeLock.unlock() } }
-                    return
+                try {
+                    g.writeCharacteristic(rc, chunk, writeType) == BluetoothStatusCodes.SUCCESS
+                } catch (_: SecurityException) {
+                    false
                 }
             } else {
                 @Suppress("DEPRECATION")
@@ -421,11 +427,23 @@ class SystemBleGattSession(
                 @Suppress("DEPRECATION")
                 rc.value = chunk
                 @Suppress("DEPRECATION")
-                try { g.writeCharacteristic(rc) }
-                catch (_: SecurityException) {
-                    if (!useWwr) { writeLock.lock(); try { writePending = false; writeReady.signalAll() } finally { writeLock.unlock() } }
-                    return
+                try {
+                    g.writeCharacteristic(rc)
+                } catch (_: SecurityException) {
+                    false
                 }
+            }
+            if (!queued) {
+                if (!useWwr) {
+                    writeLock.lock()
+                    try {
+                        writePending = false
+                        writeReady.signalAll()
+                    } finally {
+                        writeLock.unlock()
+                    }
+                }
+                throw IOException("BLE: GATT write could not be queued")
             }
             offset = end
         }
