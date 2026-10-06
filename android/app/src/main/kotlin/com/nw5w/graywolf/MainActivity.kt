@@ -140,23 +140,19 @@ class MainActivity : Activity() {
      * frame -- do NOT drop adjustResize assuming the inset path covers 28-29.
      */
     private fun applyWindowInsets() {
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        // The padded inset strips render the WebView's own background; paint it
-        // the chrome's dark tone so the bars don't flash white over the page.
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        // Keep the Android status/navigation bars outside the app content.
+        // The status bar must remain permanently visible; Graywolf should not draw
+        // underneath it. Only the IME needs explicit handling so the WebView
+        // viewport shrinks above the soft keyboard.
         webView.setBackgroundColor(getColor(R.color.chrome_bg))
         ViewCompat.setOnApplyWindowInsetsListener(webView) { v, insets ->
-            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-            // Top stays 0 on the WebView: the fixed top bar reserves the
-            // status-bar strip in CSS, using the inset we hand it below (GH #390).
-            v.setPadding(bars.left, 0, bars.right, maxOf(bars.bottom, ime.bottom))
-            // Feed the real status-bar inset to CSS as --android-inset-top.
-            // Insets are physical px; CSS works in density-independent px. Ceil
-            // (not round) so we never under-reserve the strip by a sub-pixel and
-            // let the bar creep back under the status bar.
-            val topCss = kotlin.math.ceil(bars.top / resources.displayMetrics.density).toInt()
-            if (topCss != lastTopInsetCssPx) {
-                lastTopInsetCssPx = topCss
+            v.setPadding(0, 0, 0, ime.bottom)
+            // The system now owns the status-bar area, so the SPA must not reserve
+            // a second top inset of its own.
+            if (lastTopInsetCssPx != 0) {
+                lastTopInsetCssPx = 0
                 applyTopInsetToCss()
             }
             insets
