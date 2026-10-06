@@ -232,7 +232,7 @@
   </div>
 {/if}
 
-{#if !offline}
+{#if !offline && audioDevices.length > 0}
   <div class="readiness-row">
     <div class="ready-chip" class:ok={hasInput}>
       <span class="ready-dot">{hasInput ? '\u25CF' : '\u25CB'}</span>
