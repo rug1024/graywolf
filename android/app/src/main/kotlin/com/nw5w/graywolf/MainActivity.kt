@@ -147,8 +147,13 @@ class MainActivity : Activity() {
         // viewport shrinks above the soft keyboard.
         webView.setBackgroundColor(getColor(R.color.chrome_bg))
         ViewCompat.setOnApplyWindowInsetsListener(webView) { v, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-            v.setPadding(0, 0, 0, ime.bottom)
+            // Reserve the three-button/gesture navigation area as well. On
+            // Android 15 edge-to-edge enforcement can otherwise leave WebView
+            // content visible underneath the navigation controls even with
+            // decorFitsSystemWindows enabled.
+            v.setPadding(bars.left, 0, bars.right, maxOf(bars.bottom, ime.bottom))
             // The system now owns the status-bar area, so the SPA must not reserve
             // a second top inset of its own.
             if (lastTopInsetCssPx != 0) {
