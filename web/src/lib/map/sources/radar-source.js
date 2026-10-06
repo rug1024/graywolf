@@ -52,6 +52,7 @@ const RADAR_SOURCE_ID = 'radar-tiles';
 // the RainViewer global composite, proxied as a raster overlay by the origin
 // Worker under /radar/rainviewer/*. The operator picks the region on the maps
 // tab; default is US.
+export const RADAR_REGION_OFF = 'off';
 export const RADAR_REGION_US = 'us';
 export const RADAR_REGION_WORLD = 'world';
 export const ACTIVE_RADAR_REGION = RADAR_REGION_US;
