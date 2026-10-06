@@ -77,15 +77,16 @@ export function audioLevel(pkt) {
   return { level, mark, space, lit, zone };
 }
 
-/** Format a timestamp as "M/D HH:MM:SS" in local time. */
+/** Format a timestamp as "DD.MM.YYYY HH:MM:SS" in local time. */
 export function formatTime(ts) {
   const d = new Date(ts);
-  const mo = d.getMonth() + 1;
-  const day = d.getDate();
+  const day = d.getDate().toString().padStart(2, '0');
+  const mo = (d.getMonth() + 1).toString().padStart(2, '0');
+  const year = d.getFullYear();
   const h = d.getHours().toString().padStart(2, '0');
   const m = d.getMinutes().toString().padStart(2, '0');
   const s = d.getSeconds().toString().padStart(2, '0');
-  return `${mo}/${day} ${h}:${m}:${s}`;
+  return `${day}.${mo}.${year} ${h}:${m}:${s}`;
 }
 
 /**
