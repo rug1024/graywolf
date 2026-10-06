@@ -195,19 +195,22 @@
   }
 
   onMount(async () => {
-    catalogStore.load(); // fire-and-forget; picker uses these
-    localBoundsStore.load(); // fire-and-forget; render path uses these
     ensureGwTileProtocol();
-    // Hydrate mapsState + downloadsState before the first style build
-    // so the first paint reflects the persisted source choice and any
-    // already-downloaded states. Without this, mapsState.source defaults
-    // to 'osm' on a direct page-load to /map even when the operator has
-    // selected Graywolf in settings, and the very first style is OSM.
-    await Promise.all([
-      mapsState.fetchConfig(),
-      downloadsState.refresh(),
-    ]);
-    await syncToken();
+    // Hydrate the persisted map-source choice first. Graywolf's catalog,
+    // local-bounds, download list, and token belong exclusively to the
+    // private/offline map path; an OSM session must not touch that maps
+    // infrastructure at all.
+    await mapsState.fetchConfig();
+    if (mapsState.source === 'graywolf') {
+      await Promise.all([
+        catalogStore.load(),
+        localBoundsStore.load(),
+        downloadsState.refresh(),
+      ]);
+      await syncToken();
+    } else {
+      bearerToken = null;
+    }
     const initialStyle = await buildStyle();
     // The operator may have navigated away while the awaits above were in
     // flight; onDestroy has already run. Don't build a map that will never
