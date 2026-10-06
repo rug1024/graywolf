@@ -22,6 +22,11 @@
       "description": "Dark companion to Signal with vivid radio-status colors on restrained navy surfaces."
     },
     {
+      "id": "neon-signal",
+      "name": "Neon Signal",
+      "description": "Vibrant dark palette with neon cyan, violet, magenta, lime, and amber accents for strong visual separation."
+    },
+    {
       "id": "grayscale",
       "name": "Grayscale",
       "description": "Light, monochrome. No chromatic accents."
