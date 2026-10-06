@@ -6,15 +6,29 @@
   import { themeState } from '../lib/settings/theme-store.svelte.js';
   import { uiScaleState, UI_SCALE_OPTIONS } from '../lib/settings/ui-scale-store.svelte.js';
   import { THEMES } from '../lib/themes/registry.js';
+  import { Platform } from '../lib/platform.js';
+  import {
+    getKeepRunningInBackground,
+    setKeepRunningInBackground,
+  } from '../lib/androidBridge.js';
   import PageHeader from '../components/PageHeader.svelte';
 
   const themeOptions = THEMES.map((t) => ({ value: t.id, label: t.name }));
+  let keepRunningInBackground = $state(true);
 
   onMount(() => {
     updates.fetchConfig();
     unitsState.fetchConfig();
     themeState.fetchConfig();
+    if (Platform.isAndroid) {
+      keepRunningInBackground = getKeepRunningInBackground();
+    }
   });
+
+  function setBackgroundMode(enabled) {
+    keepRunningInBackground = enabled;
+    setKeepRunningInBackground(enabled);
+  }
 
   let themeDescription = $derived(
     THEMES.find((t) => t.id === themeState.theme)?.description ?? '',
@@ -64,6 +78,21 @@
   </p>
 </Box>
 
+{#if Platform.isAndroid}
+  <Box title="Background">
+    <Toggle
+      checked={keepRunningInBackground}
+      onCheckedChange={setBackgroundMode}
+      label="Keep running in background"
+    />
+    <p class="background-hint">
+      When enabled, swiping Graywolf from recent apps closes only the screen;
+      radio links and APRS continue in the foreground service. The Stop action
+      in the Android notification always stops Graywolf.
+    </p>
+  </Box>
+{/if}
+
 <Box title="Updates">
   <Toggle
     checked={updates.enabled}
@@ -80,6 +109,7 @@
   .theme-hint,
   .scale-hint,
   .unit-hint,
+  .background-hint,
   .update-hint {
     margin-top: 12px;
     font-size: 13px;

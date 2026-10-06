@@ -78,6 +78,10 @@ class MainActivity : Activity() {
                     tokenProvider = { (application as GraywolfApp).bearerToken },
                     webView = it,
                     requestBtPermission = ::requestBluetoothPermission,
+                    getKeepRunningInBackground = { keepRunningInBackground(this) },
+                    setKeepRunningInBackground = { enabled ->
+                        setKeepRunningInBackground(this, enabled)
+                    },
                 ),
                 "GraywolfWebInterface",
             )
@@ -274,11 +278,19 @@ class MainActivity : Activity() {
         // We're committing to running, so clear any prior deliberate-stop marker;
         // future USB attaches should launch normally.
         clearUserStopped(this)
-        // Wait for any previous instance to fully exit before starting a new
-        // backend. A live predecessor still answers on the platformsvc socket;
-        // starting now would collide on the bind and (historically) crash-loop,
-        // churning the USB bus. The probe blocks, so it runs on a background
-        // thread; UI updates post back to the main thread.
+        // A launcher tap while our foreground service is already healthy must
+        // reopen the existing UI, not treat our own platform socket as a stale
+        // predecessor. Otherwise waitForPredecessorThenStart() waits on the
+        // current service until timeout and the launcher appears to do nothing.
+        if (GraywolfService.goListenerReady) {
+            Log.i(TAG, "existing graywolf service is healthy; reopening UI")
+            webView.loadUrl("http://127.0.0.1:8080/")
+            return
+        }
+
+        // Wait for a genuinely previous instance to fully exit before starting
+        // a new backend. A live predecessor still answers on platformsvc; starting
+        // now would collide on the bind and (historically) crash-loop/churn USB.
         waitForPredecessorThenStart()
     }
 
@@ -418,6 +430,7 @@ class MainActivity : Activity() {
         private const val PREFS_NAME = "graywolf-prefs"
         private const val PREF_BATTERY_OPT_REQUESTED = "battery_opt_whitelist_requested_v1"
         private const val PREF_USER_STOPPED_AT = "user_stopped_at_ms_v1"
+        private const val PREF_KEEP_RUNNING_BACKGROUND = "keep_running_background_v1"
 
         // Window after a deliberate swipe-stop during which a USB_DEVICE_ATTACHED
         // relaunch is treated as our own teardown re-enumeration (the radio's USB
@@ -440,6 +453,17 @@ class MainActivity : Activity() {
         fun markBatteryOptWhitelistRequested(ctx: Context) {
             ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().putBoolean(PREF_BATTERY_OPT_REQUESTED, true).apply()
+        }
+
+        // Background operation is opt-out: fresh installs keep the foreground
+        // service alive when the Activity is swiped from recents.
+        fun keepRunningInBackground(ctx: Context): Boolean =
+            ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(PREF_KEEP_RUNNING_BACKGROUND, true)
+
+        fun setKeepRunningInBackground(ctx: Context, enabled: Boolean) {
+            ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(PREF_KEEP_RUNNING_BACKGROUND, enabled).apply()
         }
 
         // Record the moment the operator deliberately stopped the station (swipe
