@@ -22,19 +22,26 @@
   let validation = $derived(validateCallsign(callsignInput));
   let canSubmit = $derived(consented && validation.ok && !mapsState.registering);
 
-  onMount(() => {
-    mapsState.fetchConfig();
-    catalogStore.load();
-    localBoundsStore.load();
-    downloadsState.refresh().then(() => {
-      if (
-        [...downloadsState.items.values()].some(
-          (d) => d.state === 'downloading' || d.state === 'pending',
-        )
-      ) {
-        downloadsState.ensurePolling();
-      }
-    });
+  onMount(async () => {
+    await mapsState.fetchConfig();
+
+    // OSM is fully independent of Graywolf's private map service. Do not
+    // fetch its catalog, local bounds, download state, or token-related
+    // resources unless the private Graywolf source is actually selected.
+    if (mapsState.source !== 'graywolf') return;
+
+    await Promise.all([
+      catalogStore.load(),
+      localBoundsStore.load(),
+      downloadsState.refresh(),
+    ]);
+    if (
+      [...downloadsState.items.values()].some(
+        (d) => d.state === 'downloading' || d.state === 'pending',
+      )
+    ) {
+      downloadsState.ensurePolling();
+    }
   });
 
   // Catalog-backed name lookup for downloaded slugs. Keys are
