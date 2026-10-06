@@ -27,7 +27,7 @@ import (
 // sentinel) lets the UI's defaultCh fallback pick the lowest live
 // channel for tx_channel and lets idempotent-skip absorb rf_channel.
 const (
-	DefaultIGateServer          = "rotate.aprs2.net"
+	DefaultIGateServer          = "euro.aprs2.net"
 	DefaultIGatePort            = 14580
 	DefaultIGateSoftwareName    = "graywolf"
 	DefaultIGateSoftwareVersion = "0.1"
