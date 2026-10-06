@@ -22,6 +22,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -31,6 +32,7 @@ import java.io.IOException
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
+    private lateinit var rootView: FrameLayout
     private val mainHandler = Handler(Looper.getMainLooper())
     private var didReloadOnError = false
     private var batteryOptIntentChecked = false
@@ -98,85 +100,62 @@ class MainActivity : Activity() {
                 }
             }
         }
-        setContentView(webView)
+        rootView = FrameLayout(this).apply {
+            setBackgroundColor(getColor(R.color.chrome_bg))
+            addView(
+                webView,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
+        }
+        setContentView(rootView)
         applyWindowInsets()
         ensurePerms()
     }
 
     /**
-     * Drive layout off window insets instead of letting the system pan or
-     * resize the decor for us. On Android 15+ (targetSdk 35+) edge-to-edge is
-     * mandatory: the platform stops auto-insetting content and no longer
-     * resizes the window when the soft keyboard opens, so the SPA's sticky
-     * compose bar (position:absolute; bottom:0) ends up underneath the IME --
-     * exactly the Messages-tab bug. We opt into edge-to-edge on every version,
-     * then pad the WebView by the side/bottom system bars and, crucially, by the
-     * keyboard height. Padding the WebView's bottom shrinks the web viewport
-     * above the IME, so the compose bar sits atop the keyboard and
-     * `window.innerHeight` reflects the change. ComposeBar.svelte skips its
-     * visualViewport translate in the Android shell (Platform.isAndroid) so the
-     * two don't double-offset.
+     * Android 15/16 enforce edge-to-edge for apps targeting recent SDKs.
+     * setDecorFitsSystemWindows(true) is therefore not sufficient here.
      *
-     * The TOP inset is deliberately NOT padded on the WebView here. The SPA's
-     * top bar is `position:fixed; top:0`, and a fixed element is pinned to the
-     * visual viewport, which WebView top-padding does NOT shift -- padding the
-     * top would leave the bar stranded behind the status bar (GH #390). The top
-     * bar reserves the status-bar strip itself in CSS. We cannot rely on
-     * `env(safe-area-inset-top)` for that value: Android WebView derives it from
-     * the display cutout, not the status bar, and returns 0 (or wrong values
-     * below WebView 140) on most devices -- which is why the first GH #390 fix
-     * regressed. Instead we feed the real status-bar inset to CSS as the
-     * `--android-inset-top` custom property (see `applyTopInsetToCss`); the SPA
-     * takes `max(env(safe-area-inset-top), var(--android-inset-top))` so both
-     * the Android shell and iOS / mobile browsers reserve the strip. So the top
-     * is owned by CSS (fed by us), the bottom by native padding (the viewport
-     * must actually shrink for the keyboard, which env() cannot express).
-     *
-     * Two mechanisms feed the same listener: on API 30+ the IME arrives as a
-     * `Type.ime()` inset (handled here directly). On API 28-29 `Type.ime()` is
-     * always 0, so the manifest's `windowSoftInputMode="adjustResize"` resizes
-     * the decor frame instead, which re-fires this listener with a smaller
-     * frame -- do NOT drop adjustResize assuming the inset path covers 28-29.
+     * Keep the window edge-to-edge, but put the WebView inside a native root
+     * container whose margins are the real system-bar insets. Graywolf can
+     * then never render underneath the status or navigation bars. The IME
+     * replaces the bottom navigation inset while visible.
      */
     private fun applyWindowInsets() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        // The padded inset strips render the WebView's own background; paint it
-        // the chrome's dark tone so the bars don't flash white over the page.
-        webView.setBackgroundColor(getColor(R.color.chrome_bg))
-        ViewCompat.setOnApplyWindowInsetsListener(webView) { v, insets ->
+        lastTopInsetCssPx = 0
+
+        ViewCompat.setOnApplyWindowInsetsListener(rootView) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-            // Top stays 0 on the WebView: the fixed top bar reserves the
-            // status-bar strip in CSS, using the inset we hand it below (GH #390).
-            v.setPadding(bars.left, 0, bars.right, maxOf(bars.bottom, ime.bottom))
-            // Feed the real status-bar inset to CSS as --android-inset-top.
-            // Insets are physical px; CSS works in density-independent px. Ceil
-            // (not round) so we never under-reserve the strip by a sub-pixel and
-            // let the bar creep back under the status bar.
-            val topCss = kotlin.math.ceil(bars.top / resources.displayMetrics.density).toInt()
-            if (topCss != lastTopInsetCssPx) {
-                lastTopInsetCssPx = topCss
-                applyTopInsetToCss()
+            val bottom = maxOf(bars.bottom, ime.bottom)
+
+            val lp = webView.layoutParams as FrameLayout.LayoutParams
+            if (lp.leftMargin != bars.left ||
+                lp.topMargin != bars.top ||
+                lp.rightMargin != bars.right ||
+                lp.bottomMargin != bottom) {
+                lp.setMargins(bars.left, bars.top, bars.right, bottom)
+                webView.layoutParams = lp
             }
             insets
         }
+        ViewCompat.requestApplyInsets(rootView)
     }
 
     /**
-     * Push the last-seen status-bar inset (in CSS px) into the page as the
-     * `--android-inset-top` custom property on the document root. The SPA's
-     * mobile top bar reserves the strip via
-     * `max(env(safe-area-inset-top), var(--android-inset-top))` (GH #390),
-     * working around Android WebView not reporting the status bar through
-     * env(safe-area-inset-top). Re-applied from onPageFinished because each
-     * navigation swaps in a fresh document that loses the inline property.
+     * Legacy bridge retained because onPageFinished still clears the old SPA
+     * custom property. Native decor fitting is authoritative, so this is always
+     * zero and can never double-reserve the status bar.
      */
     private fun applyTopInsetToCss() {
         if (!::webView.isInitialized) return
-        val px = lastTopInsetCssPx
         webView.post {
             webView.evaluateJavascript(
-                "document.documentElement.style.setProperty('--android-inset-top', '${px}px')",
+                "document.documentElement.style.setProperty('--android-inset-top', '0px')",
                 null,
             )
         }
