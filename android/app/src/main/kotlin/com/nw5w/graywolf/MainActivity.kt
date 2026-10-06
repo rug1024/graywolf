@@ -208,8 +208,13 @@ class MainActivity : Activity() {
             return
         }
         if (requestCode == REQ_BT_PERMS) {
-            val granted = grantResults.isNotEmpty() &&
-                grantResults[0] == PackageManager.PERMISSION_GRANTED
+            // BLE discovery needs BLUETOOTH_SCAN and the subsequent GATT/RFCOMM
+            // connection needs BLUETOOTH_CONNECT on Android 12+. Check the
+            // effective permission state instead of assuming the first result
+            // represents the whole Nearby devices permission group.
+            val granted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+                (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+                 checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED)
             val callbackId = pendingBtPermCallback
             pendingBtPermCallback = null
             if (callbackId != null) postBtResult(callbackId, granted)
@@ -217,17 +222,17 @@ class MainActivity : Activity() {
     }
 
     /**
-     * Request the BLUETOOTH_CONNECT runtime permission and report the result
-     * back to the WebView via window.__btResult(callbackId, granted).
+     * Request the Android 12+ Nearby devices permissions Graywolf needs:
+     * BLUETOOTH_SCAN for BLE discovery and BLUETOOTH_CONNECT for BLE GATT /
+     * classic RFCOMM connections. Android presents these as the Nearby devices
+     * permission group, normally in a single dialog.
      *
-     * On API <31 the permission is install-time (the legacy BLUETOOTH /
-     * BLUETOOTH_ADMIN entries in the manifest cover us) so we resolve the
-     * callback immediately with granted=true.
+     * On API <31 the legacy BLUETOOTH / BLUETOOTH_ADMIN permissions are
+     * install-time, so we resolve immediately with granted=true.
      *
-     * If the permission is already granted, we likewise short-circuit.
-     *
-     * Otherwise we store the callbackId, fire requestPermissions(), and let
-     * onRequestPermissionsResult() post the result.
+     * If both modern permissions are already granted, we likewise
+     * short-circuit. Otherwise onRequestPermissionsResult() reports the
+     * effective combined state back to the WebView.
      */
     fun requestBluetoothPermission(callbackId: String) {
         if (!WebBridgeIds.CALLBACK_ID_RE.matches(callbackId)) {
@@ -246,12 +251,22 @@ class MainActivity : Activity() {
                 postBtResult(callbackId, true)
                 return@post
             }
-            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+            val connectGranted =
+                checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+            val scanGranted =
+                checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+            if (connectGranted && scanGranted) {
                 postBtResult(callbackId, true)
                 return@post
             }
             pendingBtPermCallback = callbackId
-            requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), REQ_BT_PERMS)
+            requestPermissions(
+                arrayOf(
+                    Manifest.permission.BLUETOOTH_CONNECT,
+                    Manifest.permission.BLUETOOTH_SCAN,
+                ),
+                REQ_BT_PERMS,
+            )
         }
     }
 

@@ -15,7 +15,8 @@ import com.nw5w.graywolf.usb.UsbPttAdapter
  *
  * Phase 6 (Bluetooth KISS TNC) adds:
  *   requestBluetoothPermission(callbackId) — async runtime permission dialog
- *                                            for BLUETOOTH_CONNECT (API 31+);
+ *                                            for Android Nearby devices
+ *                                            (BLUETOOTH_SCAN + CONNECT, API 31+);
  *                                            result via window.__btResult
  *
  * The Bluetooth permission flow is delegated to MainActivity via the
@@ -76,7 +77,8 @@ class WebAppInterface(
     }
 
     /**
-     * Request the BLUETOOTH_CONNECT runtime permission (API 31+).
+     * Request the Android Nearby devices runtime permissions required for
+     * BLE scanning and connection (BLUETOOTH_SCAN + BLUETOOTH_CONNECT, API 31+).
      *
      * The actual permission dialog must be fired from the Activity, so we
      * delegate to the lambda supplied by MainActivity. Result is posted back
