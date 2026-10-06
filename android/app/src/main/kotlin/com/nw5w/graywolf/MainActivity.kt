@@ -140,7 +140,7 @@ class MainActivity : Activity() {
      * frame -- do NOT drop adjustResize assuming the inset path covers 28-29.
      */
     private fun applyWindowInsets() {
-        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         // Keep the Android status/navigation bars outside the app content.
         // The status bar must remain permanently visible; Graywolf should not draw
         // underneath it. Only the IME needs explicit handling so the WebView
@@ -153,7 +153,7 @@ class MainActivity : Activity() {
             // Android 15 edge-to-edge enforcement can otherwise leave WebView
             // content visible underneath the navigation controls even with
             // decorFitsSystemWindows enabled.
-            v.setPadding(bars.left, 0, bars.right, maxOf(bars.bottom, ime.bottom))
+            v.setPadding(bars.left, bars.top, bars.right, maxOf(bars.bottom, ime.bottom))
             // The system now owns the status-bar area, so the SPA must not reserve
             // a second top inset of its own.
             if (lastTopInsetCssPx != 0) {
