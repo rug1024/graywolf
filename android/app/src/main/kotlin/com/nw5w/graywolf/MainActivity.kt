@@ -18,6 +18,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import com.nw5w.graywolf.usb.UsbPttAdapter
+import com.nw5w.graywolf.audio.AudioConfigGate
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -184,7 +185,11 @@ class MainActivity : Activity() {
 
     private fun ensurePerms() {
         val needed = mutableListOf<String>()
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+        // KISS Network / BLE-KISS do not use Android audio capture. Only ask
+        // for RECORD_AUDIO when an enabled modem-backed channel actually has
+        // an audio input configured.
+        if (AudioConfigGate.requiresMicrophone(this) &&
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             needed += Manifest.permission.RECORD_AUDIO
         }
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {

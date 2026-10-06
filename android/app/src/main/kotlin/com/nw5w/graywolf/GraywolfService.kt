@@ -24,6 +24,7 @@ import android.util.Log
 import java.net.Inet6Address
 import com.nw5w.graywolf.BuildConfig
 import com.nw5w.graywolf.audio.AudioPump
+import com.nw5w.graywolf.audio.AudioConfigGate
 import com.nw5w.graywolf.audio.AudioTxPump
 import com.nw5w.graywolf.binaries.GoLauncher
 import com.nw5w.graywolf.binaries.Supervisor
@@ -152,6 +153,11 @@ class GraywolfService : Service() {
         }
     }
 
+    private fun shouldRunAudioCapture(): Boolean =
+        AudioConfigGate.requiresMicrophone(this) &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+
     private fun bootModem(): Boolean {
         val rc = ModemBridge.modemStart(socketPath(), /* gainDb = */ -6.0f)
         if (rc != 0) {
@@ -211,7 +217,7 @@ class GraywolfService : Service() {
         goLauncher?.stop()
         ModemBridge.modemStop()
         if (!bootModem()) return false
-        audioPump.start()
+        if (shouldRunAudioCapture()) audioPump.start()
         return bootGoChild()
     }
 
@@ -295,21 +301,21 @@ class GraywolfService : Service() {
             )
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // Phase 4a adds LOCATION FGS type alongside MICROPHONE.
-            // Android 14 throws SecurityException if we declare an FGS
-            // type whose paired access perm is denied at runtime, so
-            // only include FGS_TYPE_LOCATION when ACCESS_FINE_LOCATION
-            // is actually granted. RECORD_AUDIO is always granted by
-            // this point (MainActivity.ensurePerms gates the launch).
-            var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            // Only claim the MICROPHONE FGS type when an enabled audio-backed
+            // channel exists and RECORD_AUDIO is granted. KISS Network/BLE-KISS
+            // must run without microphone access or the privacy indicator.
+            var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            if (shouldRunAudioCapture()) {
+                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            } else {
+                Log.i(TAG, "no active audio input; starting FGS without MICROPHONE type")
+            }
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
                 fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             } else {
                 Log.i(TAG, "ACCESS_FINE_LOCATION denied; starting FGS without location type")
             }
-            // MEDIA_PLAYBACK pairs with no runtime perm; always safe to include.
-            fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
             // Per spec §3.6 + Android 14: CONNECTED_DEVICE FGS type requires that
             // at least one USB device has been granted permission at start time, or
             // startForeground throws SecurityException. Probe with UsbManager
@@ -441,7 +447,7 @@ class GraywolfService : Service() {
                 ModemBridge.modemStop()
                 return@thread
             }
-            audioPump.start()
+            if (shouldRunAudioCapture()) audioPump.start()
             if (!bootGoChild()) {              // Correction 1: never orphans the Go child now
                 audioPump.stop()
                 ModemBridge.modemStop()
