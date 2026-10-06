@@ -23,6 +23,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -32,6 +33,7 @@ import java.io.IOException
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
+    private lateinit var rootView: FrameLayout
     private val mainHandler = Handler(Looper.getMainLooper())
     private var didReloadOnError = false
     private var batteryOptIntentChecked = false
@@ -99,36 +101,50 @@ class MainActivity : Activity() {
                 }
             }
         }
-        setContentView(webView)
+        rootView = FrameLayout(this).apply {
+            setBackgroundColor(getColor(R.color.chrome_bg))
+            addView(
+                webView,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
+        }
+        setContentView(rootView)
         applyWindowInsets()
         ensurePerms()
     }
 
     /**
-     * Keep Graywolf's WebView strictly inside the Android content area.
+     * Android 15/16 enforce edge-to-edge for apps targeting recent SDKs.
+     * setDecorFitsSystemWindows(true) is therefore not sufficient here.
      *
-     * Status and navigation bars belong to Android, not to the SPA. Let the
-     * framework fit the decor to those bars instead of mixing edge-to-edge
-     * drawing with WebView padding/CSS safe-area compensation. The only inset
-     * we handle ourselves is the IME: when the keyboard is visible its bottom
-     * inset can exceed the navigation-bar inset, so add only that extra height.
+     * Keep the window edge-to-edge, but put the WebView inside a native root
+     * container whose margins are the real system-bar insets. Graywolf can
+     * then never render underneath the status or navigation bars. The IME
+     * replaces the bottom navigation inset while visible.
      */
     private fun applyWindowInsets() {
-        WindowCompat.setDecorFitsSystemWindows(window, true)
-        webView.setBackgroundColor(getColor(R.color.chrome_bg))
-
-        // Older builds injected a status-bar offset into the SPA. Native decor
-        // fitting owns that space now, so explicitly keep the CSS contribution
-        // at zero after every navigation.
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         lastTopInsetCssPx = 0
-        ViewCompat.setOnApplyWindowInsetsListener(webView) { v, insets ->
+
+        ViewCompat.setOnApplyWindowInsetsListener(rootView) { _, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-            val extraImeBottom = (ime.bottom - bars.bottom).coerceAtLeast(0)
-            v.setPadding(0, 0, 0, extraImeBottom)
+            val bottom = maxOf(bars.bottom, ime.bottom)
+
+            val lp = webView.layoutParams as FrameLayout.LayoutParams
+            if (lp.leftMargin != bars.left ||
+                lp.topMargin != bars.top ||
+                lp.rightMargin != bars.right ||
+                lp.bottomMargin != bottom) {
+                lp.setMargins(bars.left, bars.top, bars.right, bottom)
+                webView.layoutParams = lp
+            }
             insets
         }
-        ViewCompat.requestApplyInsets(webView)
+        ViewCompat.requestApplyInsets(rootView)
     }
 
     /**
