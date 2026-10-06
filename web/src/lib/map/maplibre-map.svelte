@@ -11,6 +11,7 @@
   import { Protocol } from 'pmtiles';
   import { URLShieldRenderer } from '@americana/maplibre-shield-generator';
   import { mapsState } from '../settings/maps-store.svelte.js';
+  import { unitsState } from '../settings/units-store.svelte.js';
   import { osmRasterStyle } from './sources/osm-raster.js';
   import { downloadsState } from '../maps/downloads-store.svelte.js';
   import { catalogStore } from '../maps/catalog-store.svelte.js';
@@ -28,6 +29,7 @@
 
   let container;
   let map = null;
+  let scaleControl = null;
   let bearerToken = $state(null);
   // Set in onDestroy. The onMount below is async and only creates the map
   // after several awaited fetches; if the operator navigates away during
@@ -232,10 +234,11 @@
       }),
       'top-right',
     );
-    map.addControl(
-      new maplibregl.ScaleControl({ maxWidth: 100, unit: 'imperial' }),
-      'bottom-left',
-    );
+    scaleControl = new maplibregl.ScaleControl({
+      maxWidth: 100,
+      unit: unitsState.isMetric ? 'metric' : 'imperial',
+    });
+    map.addControl(scaleControl, 'bottom-left');
     // Wire up the americana highway-shield generator. The americana
     // style references runtime-generated shield images via image IDs
     // like "shield\nUS:I\n70\n" -- one styleimagemissing event per
@@ -359,6 +362,14 @@
       .catch((err) => {
         console.warn('build map style failed:', err);
       });
+  });
+
+  // Keep MapLibre's scale bar in sync with the global units preference.
+  // ScaleControl does not observe application state by itself; setUnit()
+  // updates the existing control without remounting the map.
+  $effect(() => {
+    const unit = unitsState.isMetric ? 'metric' : 'imperial';
+    scaleControl?.setUnit(unit);
   });
 
   // When registered flips, refresh the token.
