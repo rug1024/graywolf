@@ -3,7 +3,7 @@
   import { Box, Button, Input, Toggle, Radio, RadioGroup } from '@chrissnell/chonky-ui';
   import { mapsState, ISSUES_URL } from '../lib/settings/maps-store.svelte.js';
   import { mapState } from '../lib/map/map-store.svelte.js';
-  import { RADAR_REGION_US, RADAR_REGION_WORLD } from '../lib/map/sources/radar-source.js';
+  import { RADAR_REGION_OFF, RADAR_REGION_US, RADAR_REGION_WORLD } from '../lib/map/sources/radar-source.js';
   import { validateCallsign } from '../lib/maps/callsign.js';
   import { downloadsState } from '../lib/maps/downloads-store.svelte.js';
   import { catalogStore } from '../lib/maps/catalog-store.svelte.js';
@@ -117,6 +117,11 @@
   // Radar coverage region. Per-browser preference (mapState persists it to
   // localStorage); the live map's radar layer reflects the choice immediately.
   const radarRegions = [
+    {
+      value: RADAR_REGION_OFF,
+      label: 'Off',
+      sublabel: 'Disable radar and do not contact the radar server.',
+    },
     {
       value: RADAR_REGION_US,
       label: 'United States (NEXRAD)',
@@ -298,7 +303,7 @@
 
 <Box title="Radar region">
   <p class="prose">
-    Choose which radar overlay the live map shows. NEXRAD covers the United
+    Choose whether to disable radar or which radar overlay the live map shows. NEXRAD covers the United
     States; RainViewer covers the rest of the world.
   </p>
   <RadioGroup
