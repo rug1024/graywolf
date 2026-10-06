@@ -428,6 +428,14 @@
   :global(.maplibregl-ctrl-attrib a) {
     color: var(--map-overlay-fg) !important;
   }
+  /* Compass: keep north visually unambiguous across every theme. MapLibre's
+     stock compass uses a dark north needle which is easy to misread on our
+     themed controls. Replace only the icon artwork; control behaviour stays
+     native (drag to rotate, tap to reset north). */
+  :global(.maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2029%2029'%3E%3Cpath%20fill='%23e53935'%20d='M14.5%203.5l5.5%2011h-5.5z'/%3E%3Cpath%20fill='%23858b94'%20d='M14.5%2025.5l-5.5-11h5.5z'/%3E%3C/svg%3E") !important;
+  }
+
   /* Hide MapLibre's +/- zoom buttons on touch viewports — pinch-zoom
      is sufficient and the buttons would clash with the FAB. Keep the
      compass so operators can still reset bearing after a rotate. */
