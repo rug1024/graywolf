@@ -530,7 +530,7 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     background: var(--color-bg);
-    padding: 16px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     align-items: center;

@@ -498,19 +498,21 @@ class GraywolfService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // Swiping the app from recents removes the Activity but, with
-    // android:stopWithTask unset (default false), the foreground service
-    // keeps running and so would the forked Go backend. Stop ourselves so
-    // onDestroy's full teardown runs (supervisor, Go child SIGTERM, modem,
-    // audio, USB PTT, platform server). A fresh launch then rebuilds the
-    // service -- re-enumerating USB and rebooting the modem -- which is
-    // also exactly what hot-swap recovery needs.
+    // Swiping Graywolf from recents normally removes only the UI. The
+    // foreground service, BLE/KISS links and APRS backend keep running by
+    // default. Operators who prefer swipe-to-stop can disable "Keep running
+    // in background" in Preferences. The notification's Stop action always
+    // calls stopSelf() independently of this setting.
     override fun onTaskRemoved(rootIntent: Intent?) {
-        Log.i(TAG, "onTaskRemoved: task swiped away, stopping service")
+        if (MainActivity.keepRunningInBackground(this)) {
+            Log.i(TAG, "onTaskRemoved: task swiped away; background operation enabled")
+            super.onTaskRemoved(rootIntent)
+            return
+        }
+
+        Log.i(TAG, "onTaskRemoved: task swiped away; background operation disabled, stopping service")
         // Mark this as a deliberate stop so the USB_DEVICE_ATTACHED relaunch
-        // caused by our own teardown releasing the radio (the interfaces
-        // re-enumerate ~2s later) is suppressed in MainActivity rather than
-        // silently reviving the station the operator just dismissed.
+        // caused by teardown releasing the radio is suppressed in MainActivity.
         MainActivity.markUserStopped(this)
         stopSelf()
         super.onTaskRemoved(rootIntent)

@@ -81,6 +81,10 @@ class MainActivity : Activity() {
                     tokenProvider = { (application as GraywolfApp).bearerToken },
                     webView = it,
                     requestBtPermission = ::requestBluetoothPermission,
+                    getKeepRunningInBackground = { keepRunningInBackground(this) },
+                    setKeepRunningInBackground = { enabled ->
+                        setKeepRunningInBackground(this, enabled)
+                    },
                 ),
                 "GraywolfWebInterface",
             )
@@ -425,6 +429,7 @@ class MainActivity : Activity() {
         private const val PREFS_NAME = "graywolf-prefs"
         private const val PREF_BATTERY_OPT_REQUESTED = "battery_opt_whitelist_requested_v1"
         private const val PREF_USER_STOPPED_AT = "user_stopped_at_ms_v1"
+        private const val PREF_KEEP_RUNNING_BACKGROUND = "keep_running_background_v1"
 
         // Window after a deliberate swipe-stop during which a USB_DEVICE_ATTACHED
         // relaunch is treated as our own teardown re-enumeration (the radio's USB
@@ -447,6 +452,17 @@ class MainActivity : Activity() {
         fun markBatteryOptWhitelistRequested(ctx: Context) {
             ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .edit().putBoolean(PREF_BATTERY_OPT_REQUESTED, true).apply()
+        }
+
+        // Background operation is opt-out: fresh installs keep the foreground
+        // service alive when the Activity is swiped from recents.
+        fun keepRunningInBackground(ctx: Context): Boolean =
+            ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(PREF_KEEP_RUNNING_BACKGROUND, true)
+
+        fun setKeepRunningInBackground(ctx: Context, enabled: Boolean) {
+            ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit().putBoolean(PREF_KEEP_RUNNING_BACKGROUND, enabled).apply()
         }
 
         // Record the moment the operator deliberately stopped the station (swipe

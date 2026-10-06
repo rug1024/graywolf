@@ -30,9 +30,19 @@ class WebAppInterface(
     private val webView: WebView,
     private val adapter: UsbPttAdapter = UsbPttAdapter,
     private val requestBtPermission: (callbackId: String) -> Unit = {},
+    private val getKeepRunningInBackground: () -> Boolean = { true },
+    private val setKeepRunningInBackground: (Boolean) -> Unit = {},
 ) {
     @JavascriptInterface
     fun getBearerToken(): String = tokenProvider()
+
+    @JavascriptInterface
+    fun getKeepRunningInBackground(): Boolean = getKeepRunningInBackground.invoke()
+
+    @JavascriptInterface
+    fun setKeepRunningInBackground(enabled: Boolean) {
+        setKeepRunningInBackground.invoke(enabled)
+    }
 
     /**
      * Snapshot of attached USB devices for the SPA channel-config status row.

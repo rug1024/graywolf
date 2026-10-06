@@ -136,29 +136,29 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		if ch.InputDeviceID != nil {
 			sc.InputDeviceID = *ch.InputDeviceID
 		}
-		haveBridgeStats := false
-		if s.bridge != nil {
-			if stats, ok := s.bridge.GetChannelStats(uint32(ch.ID)); ok {
-				haveBridgeStats = true
-				sc.RxFrames = stats.RxFrames
-				sc.RxBadFCS = stats.RxBadFCS
-				sc.TxFrames = stats.TxFrames
-				sc.DcdState = stats.DcdState
-				sc.AudioPeak = stats.AudioLevelPeak
+		// Choose the live counter source from the channel backing, not from
+		// whichever cache happens to contain an entry. A KISS-only channel
+		// has no input audio device; the modem bridge can still retain a
+		// stale/zero StatusUpdate for the same channel id after a reconfigure.
+		// Letting that cache win makes active BLE/serial KISS RX/TX appear as
+		// 0 on the dashboard even while packets are being iGated.
+		if ch.InputDeviceID != nil {
+			if s.bridge != nil {
+				if stats, ok := s.bridge.GetChannelStats(uint32(ch.ID)); ok {
+					sc.RxFrames = stats.RxFrames
+					sc.RxBadFCS = stats.RxBadFCS
+					sc.TxFrames = stats.TxFrames
+					sc.DcdState = stats.DcdState
+					sc.AudioPeak = stats.AudioLevelPeak
+				}
 			}
-		}
-		// KISS-TNC-backed channels have no Rust modem and thus no
-		// StatusUpdate feeding the bridge cache; fall back to the
-		// KISS manager's per-channel counters so their RX/TX no
-		// longer read a stuck zero (issue #132). RxBadFCS stays 0:
-		// a hardware TNC validates the FCS and never forwards a bad
-		// frame over KISS. The validator forbids a channel being
-		// both modem- and KISS-backed, so this never double-counts.
-		if !haveBridgeStats && s.kissManager != nil {
+		} else if s.kissManager != nil {
 			if ks, ok := s.kissManager.ChannelStats(uint32(ch.ID)); ok {
 				sc.RxFrames = ks.RxFrames
 				sc.TxFrames = ks.TxFrames
 			}
+			// RxBadFCS deliberately stays 0: a hardware TNC validates FCS
+			// before forwarding frames over KISS.
 		}
 		if deviceLevels != nil && ch.InputDeviceID != nil {
 			if dl, ok := deviceLevels[*ch.InputDeviceID]; ok {
