@@ -27,9 +27,9 @@ function loadInt(key, fallback) {
 
 // Radar coverage region -- a per-browser map preference chosen on the maps
 // settings tab and consumed by the radar layer on the live map. Only two
-// values are valid; anything else falls back to US.
+// values are valid; anything else falls back to rest of world.
 function normalizeRadarRegion(v) {
-  return v === RADAR_REGION_WORLD ? RADAR_REGION_WORLD : RADAR_REGION_US;
+  return v === RADAR_REGION_US ? RADAR_REGION_US : RADAR_REGION_WORLD;
 }
 
 const hasSavedCenter = localStorage.getItem('map-center-lat') != null;
