@@ -128,6 +128,34 @@ jobs:
           key: gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
+      # Android's default debug keystore lives outside the repository. GitHub's
+      # hosted runners are ephemeral, so without persisting it every workflow
+      # run generates a new signing certificate and Android refuses to install
+      # the next debug APK as an update. Keep one branch-scoped debug keystore
+      # in the Actions cache so successive test APKs remain upgrade-compatible.
+      # The debug key is not a release credential and carries no trust value.
+      - name: Restore stable debug keystore
+        id: debug-keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: graywolf-debug-keystore-v1
+
+      - name: Create debug keystore on first run
+        if: steps.debug-keystore.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.android
+          keytool -genkeypair -v \
+            -keystore ~/.android/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       # Diagnostic: prove the NDK clang wrappers are at the path Gradle
       # expects before invoking the build. Cheap insurance against silent
       # NDK-version drift.
