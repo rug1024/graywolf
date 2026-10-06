@@ -360,7 +360,7 @@ type DigipeaterBlocklist struct {
 type IGateConfig struct {
 	ID              uint32    `gorm:"primaryKey;autoIncrement" json:"id"`
 	Enabled         bool      `gorm:"not null;default:false" json:"enabled"`
-	Server          string    `gorm:"not null;default:'rotate.aprs2.net'" json:"server"`
+	Server          string    `gorm:"not null;default:'euro.aprs2.net'" json:"server"`
 	Port            uint32    `gorm:"not null;default:14580" json:"port"`
 	ServerFilter    string    `json:"server_filter"` // APRS-IS server-side filter expression
 	SimulationMode  bool      `gorm:"not null;default:false" json:"simulation_mode"`
