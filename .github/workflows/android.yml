@@ -138,16 +138,16 @@ jobs:
         id: debug-keystore
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
+          path: ~/.config/.android/debug.keystore
           key: graywolf-debug-keystore-v1
 
       - name: Create debug keystore on first run
         if: steps.debug-keystore.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
-          mkdir -p ~/.android
+          mkdir -p ~/.config/.android
           keytool -genkeypair -v \
-            -keystore ~/.android/debug.keystore \
+            -keystore ~/.config/.android/debug.keystore \
             -storepass android \
             -alias androiddebugkey \
             -keypass android \
