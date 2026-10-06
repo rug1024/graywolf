@@ -230,24 +230,11 @@ func (a *App) wireServicesInner(ctx context.Context, configDBFresh bool) error {
 	// ScanBLEMobilinkd and OpenBLEMobilinkd can route through the Kotlin BLE bridge.
 	a.injectAndroidBLEClient()
 	plCfg, _ := a.store.GetPositionLogConfig(ctx)
-	// On Android, default the position log to enabled on first boot.
-	// The desktop default (off) protects SD-card-based Pi installs from
-	// write amplification; Android internal storage doesn't share that
-	// constraint and a disabled history db wipes the live map on every
-	// process restart -- a confusing failure mode for the operator.
-	if plCfg == nil && platform.Kind == "android" && a.cfg.HistoryDBPath != "" {
-		seeded := &configstore.PositionLogConfig{
-			Enabled: true,
-			DBPath:  a.cfg.HistoryDBPath,
-		}
-		if err := a.store.UpsertPositionLogConfig(ctx, seeded); err != nil {
-			a.logger.Warn("seed position log config failed", "err", err)
-		} else {
-			a.logger.Info("seeded position log config (android first-boot default)",
-				"path", a.cfg.HistoryDBPath)
-			plCfg = seeded
-		}
-	}
+	// Position history is opt-in on every platform, including Android.
+	// A missing singleton therefore means disabled. Do not seed an enabled
+	// row on first boot: that would override PositionLogConfig's documented
+	// default:false and make a fresh Android install start writing history
+	// before the operator explicitly enables it.
 	// On a genuinely fresh Android config DB, seed the synthetic
 	// Default Input/Output rows used by the built-in phone audio modem.
 	// Do this only on first database creation. An empty audio_devices
