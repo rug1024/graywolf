@@ -118,9 +118,7 @@
     { key: 'timestamp', label: 'Time',    width: '130px', class: 'pkt-c-time',           render: timeCell    },
     { key: 'type',      label: 'Type',    width: '180px', class: 'pkt-c-type',           render: typeCell    },
     { key: 'srcdst',    label: 'Src→Dst', width: '1fr',   class: 'pkt-c-srcdst',         render: srcDstCell  },
-    { key: 'level',     label: 'Level',   width: '110px', class: 'pkt-c-level',          render: levelCell   },
-    { key: 'channel',   label: 'Channel', width: '120px', class: 'pkt-c-channel', render: channelCell },
-    { key: 'distance',  label: 'Distance',width: '120px', class: 'pkt-c-distance', align: 'right', render: distanceCell },
+    { key: 'metadata',  label: 'Details', width: '240px', class: 'pkt-c-metadata', render: metadataCell },
   ];
 </script>
 
@@ -170,36 +168,39 @@
   </span>
 {/snippet}
 
-{#snippet levelCell(_value, entry)}
+{#snippet metadataCell(_value, entry)}
   {@const al = audioLevel(entry)}
-  {#if al}
-    <span
-      class="pkt-alevel"
-      data-zone={al.zone}
-      title={`audio level ${al.level} dBFS (mark ${al.mark} / space ${al.space})`}
-    >
-      <span class="pkt-alevel-bars" aria-hidden="true">
-        {#each Array(10) as _, i}
-          <span class="pkt-alevel-seg" class:on={i < al.lit}></span>
-        {/each}
+  <span class="pkt-metadata">
+    {#if al}
+      <span class="pkt-meta-item">
+        <span class="pkt-meta-label">Level:</span>
+        <span
+          class="pkt-alevel"
+          data-zone={al.zone}
+          title={`audio level ${al.level} dBFS (mark ${al.mark} / space ${al.space})`}
+        >
+          <span class="pkt-alevel-bars" aria-hidden="true">
+            {#each Array(10) as _, i}
+              <span class="pkt-alevel-seg" class:on={i < al.lit}></span>
+            {/each}
+          </span>
+          <span class="pkt-alevel-num">{al.level}</span>
+        </span>
       </span>
-      <span class="pkt-alevel-num">{al.level}</span>
+    {/if}
+    <span class="pkt-meta-item">
+      <span class="pkt-meta-label">Channel:</span>
+      <span>{entry.channel_name || (entry.channel ?? '—')}</span>
     </span>
-  {:else}
-    <span class="pkt-dim">—</span>
-  {/if}
-{/snippet}
-
-{#snippet channelCell(_value, entry)}
-  {entry.channel_name || (entry.channel ?? '—')}
-{/snippet}
-
-{#snippet distanceCell(_value, entry)}
-  {#if entry.distance_mi != null}
-    <span class="pkt-distance">{formatDistance(entry.distance_mi)}</span>
-  {:else}
-    <span class="pkt-dim">—</span>
-  {/if}
+    <span class="pkt-meta-item">
+      <span class="pkt-meta-label">Distance:</span>
+      {#if entry.distance_mi != null}
+        <span class="pkt-distance">{formatDistance(entry.distance_mi)}</span>
+      {:else}
+        <span class="pkt-dim">—</span>
+      {/if}
+    </span>
+  </span>
 {/snippet}
 
 {#snippet rawPacketFooter(entry)}
@@ -294,6 +295,21 @@
     color: var(--color-info);
   }
 
+  .pkt-metadata {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .pkt-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  .pkt-meta-label {
+    color: var(--color-text-dim);
+  }
   .pkt-distance {
     font-size: var(--text-xs);
     color: var(--color-success);
