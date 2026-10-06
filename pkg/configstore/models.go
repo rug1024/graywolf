@@ -392,7 +392,7 @@ type IGateRfFilter struct {
 	Pattern   string    `gorm:"not null" json:"pattern"`
 	Action    string    `gorm:"not null;default:'allow'" json:"action"` // allow|deny
 	Priority  uint32    `gorm:"not null;default:100" json:"priority"`
-	Enabled   bool      `gorm:"not null;default:true" json:"enabled"`
+	Enabled   bool      `gorm:"not null;default:false" json:"enabled"`
 	CreatedAt time.Time `json:"-"`
 	UpdatedAt time.Time `json:"-"`
 }
