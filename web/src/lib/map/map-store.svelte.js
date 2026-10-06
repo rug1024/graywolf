@@ -7,7 +7,7 @@
 // (when available from /api/position) is applied by LiveMapV2 as a
 // one-shot recentering after the data store first reports it.
 
-import { RADAR_REGION_US, RADAR_REGION_WORLD } from './sources/radar-source.js';
+import { RADAR_REGION_OFF, RADAR_REGION_US, RADAR_REGION_WORLD } from './sources/radar-source.js';
 
 // Slightly above the equator so the world view shows more land than ocean.
 const WORLD_CENTER = [20, 0];
@@ -29,7 +29,9 @@ function loadInt(key, fallback) {
 // settings tab and consumed by the radar layer on the live map. Only two
 // values are valid; anything else falls back to rest of world.
 function normalizeRadarRegion(v) {
-  return v === RADAR_REGION_US ? RADAR_REGION_US : RADAR_REGION_WORLD;
+  return v === RADAR_REGION_OFF || v === RADAR_REGION_US || v === RADAR_REGION_WORLD
+    ? v
+    : RADAR_REGION_WORLD;
 }
 
 const hasSavedCenter = localStorage.getItem('map-center-lat') != null;
