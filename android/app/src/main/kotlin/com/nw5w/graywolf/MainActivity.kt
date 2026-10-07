@@ -22,6 +22,7 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -31,6 +32,7 @@ import java.io.IOException
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
+    private lateinit var rootView: FrameLayout
     private val mainHandler = Handler(Looper.getMainLooper())
     private var didReloadOnError = false
     private var batteryOptIntentChecked = false
@@ -88,7 +90,17 @@ class MainActivity : Activity() {
                 }
             }
         }
-        setContentView(webView)
+        rootView = FrameLayout(this).apply {
+            setBackgroundColor(getColor(R.color.chrome_bg))
+            addView(
+                webView,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
+        }
+        setContentView(rootView)
         applyWindowInsets()
         ensurePerms()
     }
@@ -108,22 +120,27 @@ class MainActivity : Activity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val chromeBg = getColor(R.color.chrome_bg)
         webView.setBackgroundColor(chromeBg)
-        // Paint the system-bar areas (outside the WebView margins) the same
-        // color as the app so they don't flash white during inset changes.
+        // Paint the system-bar areas outside the child WebView with the same
+        // chrome color. The explicit FrameLayout also guarantees that the
+        // WebView has MarginLayoutParams on every supported Android version.
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(chromeBg))
-        ViewCompat.setOnApplyWindowInsetsListener(webView) { v, insets ->
+        ViewCompat.setOnApplyWindowInsetsListener(rootView) { _, insets ->
             val statusBars = insets.getInsets(WindowInsetsCompat.Type.statusBars())
             val navBars = insets.getInsets(WindowInsetsCompat.Type.navigationBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-            (v.layoutParams as? android.view.ViewGroup.MarginLayoutParams)?.let { lp ->
-                lp.topMargin = statusBars.top
-                lp.leftMargin = navBars.left
-                lp.rightMargin = navBars.right
-                lp.bottomMargin = maxOf(navBars.bottom, ime.bottom)
-                v.layoutParams = lp
+
+            val lp = webView.layoutParams as FrameLayout.LayoutParams
+            val bottom = maxOf(navBars.bottom, ime.bottom)
+            if (lp.topMargin != statusBars.top ||
+                lp.leftMargin != navBars.left ||
+                lp.rightMargin != navBars.right ||
+                lp.bottomMargin != bottom) {
+                lp.setMargins(navBars.left, statusBars.top, navBars.right, bottom)
+                webView.layoutParams = lp
             }
             insets
         }
+        ViewCompat.requestApplyInsets(rootView)
     }
 
     private fun ensurePerms() {
