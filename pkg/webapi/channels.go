@@ -705,12 +705,19 @@ func (s *Server) getChannelStats(w http.ResponseWriter, r *http.Request) {
 		badRequest(w, "invalid channel id")
 		return
 	}
-	// Only consult the modem bridge for channels with an audio input device.
-	// On Android the modem always emits StatusUpdate for its default channel_id
-	// even without a ConfigureChannel (pure KISS-only setup), producing a
-	// zero-stats cache entry that would mask the KISS manager's real counts.
-	ch, _ := s.store.GetChannel(r.Context(), id)
-	if s.bridge != nil && (ch == nil || ch.InputDeviceID != nil) {
+	// Resolve channel backing before choosing a stats source. A store error
+	// must not fail open into the modem bridge: on Android that can re-expose
+	// the stale default-channel zero entry this handler is specifically avoiding.
+	ch, err := s.store.GetChannel(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			notFound(w)
+			return
+		}
+		s.internalError(w, r, "get channel for stats", err)
+		return
+	}
+	if s.bridge != nil && channelUsesModemStats(ch) {
 		if stats, ok := s.bridge.GetChannelStats(id); ok {
 			writeJSON(w, http.StatusOK, stats)
 			return

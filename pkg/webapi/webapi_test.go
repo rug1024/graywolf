@@ -82,6 +82,43 @@ func newTestServerWithAuth(t *testing.T, authBaseURL string) (*Server, *modembri
 	return srv, bridge
 }
 
+
+func TestChannelStatsEndpoint_KissOnlyIgnoresStaleBridgeStats(t *testing.T) {
+	srv, bridge := newTestServer(t)
+	configureKissOnlyStats(t, srv, 1, 3)
+	bridge.InjectStatusForTest(1, 0, 0, 0, 0, 0, 0, false)
+
+	mux := http.NewServeMux()
+	srv.RegisterRoutes(mux)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/channels/1/stats", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var stats modembridge.ChannelStats
+	if err := json.NewDecoder(rec.Body).Decode(&stats); err != nil {
+		t.Fatal(err)
+	}
+	if stats.TxFrames != 3 {
+		t.Fatalf("KISS-only tx_frames=%d, want 3; stale bridge entry masked KISS stats", stats.TxFrames)
+	}
+}
+
+func TestChannelStatsEndpoint_StoreErrorReturns500(t *testing.T) {
+	srv, _ := newTestServer(t)
+	if err := srv.store.Close(); err != nil {
+		t.Fatalf("close store: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	srv.RegisterRoutes(mux)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/channels/1/stats", nil))
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500 on store error, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestChannelStatsEndpoint(t *testing.T) {
 	srv, bridge := newTestServer(t)
 	bridge.InjectStatusForTest(1, 42, 3, 10, 0.5, 0.3, 0.6, true)

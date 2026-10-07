@@ -1,6 +1,7 @@
 package webapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,11 +9,64 @@ import (
 	"time"
 
 	"github.com/chrissnell/graywolf/pkg/igate"
+	"github.com/chrissnell/graywolf/pkg/kiss"
 )
 
 // TestStatusDTO_WireShape_WithoutIgate confirms that the flattened
 // StatusIgateDTO still omits the "igate" key entirely when the iGate is
 // absent, matching the previous *igate.Status behavior.
+
+func configureKissOnlyStats(t *testing.T, srv *Server, channelID uint32, txFrames int) {
+	t.Helper()
+	ctx := context.Background()
+	ch, err := srv.store.GetChannel(ctx, channelID)
+	if err != nil {
+		t.Fatalf("get channel %d: %v", channelID, err)
+	}
+	ch.InputDeviceID = nil
+	ch.OutputDeviceID = 0
+	if err := srv.store.UpdateChannel(ctx, ch); err != nil {
+		t.Fatalf("convert channel %d to KISS-only: %v", channelID, err)
+	}
+
+	mgr := kiss.NewManager(kiss.ManagerConfig{})
+	t.Cleanup(mgr.StopAll)
+	for i := 0; i < txFrames; i++ {
+		mgr.RecordChannelTx(channelID)
+	}
+	srv.kissManager = mgr
+}
+
+func TestHandleStatus_KissOnlyIgnoresStaleBridgeStats(t *testing.T) {
+	srv, bridge := newTestServer(t)
+	configureKissOnlyStats(t, srv, 1, 3)
+
+	// Reproduce Android's stale/default modem StatusUpdate for channel 1.
+	// KISS-only status must come from kiss.Manager instead.
+	bridge.InjectStatusForTest(1, 0, 0, 0, 0, 0, 0, false)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/status", nil)
+	rec := httptest.NewRecorder()
+	srv.handleStatus(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var got StatusDTO
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	for _, ch := range got.Channels {
+		if ch.ID == 1 {
+			if ch.TxFrames != 3 {
+				t.Fatalf("KISS-only tx_frames=%d, want 3; stale bridge entry masked KISS stats", ch.TxFrames)
+			}
+			return
+		}
+	}
+	t.Fatal("channel 1 missing from status response")
+}
+
 func TestStatusDTO_WireShape_WithoutIgate(t *testing.T) {
 	dto := StatusDTO{
 		UptimeSeconds: 42,

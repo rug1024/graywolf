@@ -144,7 +144,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		// bridge cache. Consulting the bridge for a KISS-only channel (BLE,
 		// Bluetooth, serial, tcp-client) would set haveBridgeStats=true and
 		// permanently mask the KISS manager's real RX/TX counts.
-		if s.bridge != nil && ch.InputDeviceID != nil {
+		if s.bridge != nil && channelUsesModemStats(&ch) {
 			if stats, ok := s.bridge.GetChannelStats(uint32(ch.ID)); ok {
 				haveBridgeStats = true
 				sc.RxFrames = stats.RxFrames
