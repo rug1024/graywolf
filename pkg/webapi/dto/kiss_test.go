@@ -370,6 +370,33 @@ func TestKissRequest_Validate_UsbSerial(t *testing.T) {
 	}
 }
 
+func TestKissRequest_Validate_BLEDevice(t *testing.T) {
+	// BLE is a byte stream with no host-side baud rate, but it must have
+	// a selected peripheral address before it can be persisted.
+	ok := KissRequest{
+		Type:         configstore.KissTypeBLEDevice,
+		SerialDevice: "AA:BB:CC:DD:EE:FF",
+		Mode:         configstore.KissModeTnc,
+	}
+	if err := ok.Validate(); err != nil {
+		t.Fatalf("valid ble-device rejected: %v", err)
+	}
+
+	noDev := KissRequest{
+		Type: configstore.KissTypeBLEDevice,
+		Mode: configstore.KissModeTnc,
+	}
+	if err := noDev.Validate(); err == nil {
+		t.Fatal("ble-device without serial_device should be rejected")
+	}
+
+	// A baud rate is deliberately not required for BLE.
+	ok.BaudRate = 0
+	if err := ok.Validate(); err != nil {
+		t.Fatalf("ble-device with zero baud_rate rejected: %v", err)
+	}
+}
+
 // TestKissFromModel_TcpClient_Roundtrip ensures response mapping
 // includes the new fields.
 func TestKissFromModel_TcpClient_Roundtrip(t *testing.T) {

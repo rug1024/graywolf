@@ -3995,6 +3995,48 @@
                 }
             }
         },
+        "/kiss/ble-device-scan": {
+            "get": {
+                "security": [
+                    {
+                        "CookieAuth": []
+                    }
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "kiss"
+                ],
+                "summary": "Scan for BLE KISS TNC devices",
+                "operationId": "scanBLEMobilinkd",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Scan duration in seconds (default 15, max 60)",
+                        "name": "timeout",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE stream of BLEDevice objects"
+                    },
+                    "409": {
+                        "description": "scan already in progress",
+                        "schema": {
+                            "$ref": "#/definitions/webtypes.ErrorResponse"
+                        }
+                    },
+                    "501": {
+                        "description": "not available on this platform",
+                        "schema": {
+                            "$ref": "#/definitions/webtypes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/kiss/bonded-bt-devices": {
             "get": {
                 "security": [

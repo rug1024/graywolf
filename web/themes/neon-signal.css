@@ -1,0 +1,79 @@
+/*
+ * Neon Signal -- experimental high-energy palette inspired by modern
+ * radio/messaging dashboards. Dark navy surfaces keep the content readable
+ * while cyan, violet, magenta, lime and amber provide vivid functional accents.
+ */
+:root:root[data-theme="neon-signal"] {
+  --color-bg: #070a16;
+  --color-surface: #10152a;
+  --color-surface-raised: #181f3d;
+  --color-border: #303b66;
+  --color-border-subtle: #202947;
+  --color-text: #f4f7ff;
+  --color-text-muted: #b9c3df;
+  --color-text-dim: #8591b3;
+  --color-text-inverse: #050812;
+
+  --color-primary: #00e5ff;
+  --color-primary-hover: #67f3ff;
+  --color-primary-muted: rgba(0, 229, 255, 0.17);
+  --color-primary-fg: #041015;
+  --color-accent: #b56cff;
+
+  --color-danger: #ff3d8d;
+  --color-danger-hover: #ff75ae;
+  --color-danger-muted: rgba(255, 61, 141, 0.18);
+  --color-danger-fg: #ffffff;
+  --color-success: #38f2a0;
+  --color-success-fill: #38f2a0;
+  --color-success-muted: rgba(56, 242, 160, 0.17);
+  --color-success-fg: #04130d;
+  --color-warning: #ffcc33;
+  --color-warning-muted: rgba(255, 204, 51, 0.18);
+  --color-warning-fg: #171000;
+  --color-info: #38bdf8;
+  --color-info-muted: rgba(56, 189, 248, 0.18);
+  --color-info-fg: #041015;
+
+  --color-btn-bg: #181f3d;
+  --color-btn-bg-hover: #242e55;
+  --color-btn-border: #3d4a7a;
+  --font-mono: 'Inconsolata', 'Courier New', monospace;
+  --radius: 8px;
+
+  --map-overlay-bg: color-mix(in srgb, #10152a 88%, transparent);
+  --map-overlay-blur: 12px;
+  --map-overlay-fg: #f4f7ff;
+  --map-overlay-muted: #b9c3df;
+  --map-overlay-border: #3d4a7a;
+  --map-overlay-shadow: 0 5px 22px rgba(0, 0, 0, 0.62);
+  --map-attribution-bg: color-mix(in srgb, #10152a 92%, transparent);
+  --map-temp-fg: #ffffff;
+  --map-temp-bg: rgba(7, 10, 22, 0.88);
+  --map-temp-border: rgba(0, 229, 255, 0.55);
+}
+
+:root[data-theme="neon-signal"] .badge-success { background: rgba(56,242,160,.18); color:#63ffb7; border-color:rgba(56,242,160,.55); }
+:root[data-theme="neon-signal"] .badge-warning { background: rgba(255,204,51,.18); color:#ffe066; border-color:rgba(255,204,51,.55); }
+:root[data-theme="neon-signal"] .badge-danger  { background: rgba(255,61,141,.18); color:#ff75ae; border-color:rgba(255,61,141,.55); }
+:root[data-theme="neon-signal"] .badge-info    { background: rgba(0,229,255,.16); color:#67f3ff; border-color:rgba(0,229,255,.50); }
+
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='position']     { background:#006dff; color:#fff; }
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='weather']      { background:#00bfa5; color:#031713; }
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='telemetry']    { background:#ffb300; color:#181000; }
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='message']      { background:#00cfe8; color:#031417; }
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='object']       { background:#8b5cf6; color:#fff; }
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='item']         { background:#39d353; color:#061407; }
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='mic-e']        { background:#ff3d8d; color:#fff; }
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='status']       { background:#6474a8; color:#fff; }
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='capabilities'] { background:#c026d3; color:#fff; }
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='df-report'],
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='query']        { background:#ff6b35; color:#fff; }
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='third-party'],
+:root[data-theme="neon-signal"] .pkt-b-type[data-type='unknown']      { background:#52607f; color:#fff; }
+
+:root[data-theme="neon-signal"] .pkt-b-origin[data-origin='bcn'] { background:#ff6b35; color:#fff; }
+:root[data-theme="neon-signal"] .pkt-b-origin[data-origin='digi'] { background:#006dff; color:#fff; }
+:root[data-theme="neon-signal"] .pkt-b-origin[data-origin='igate'],
+:root[data-theme="neon-signal"] .pkt-b-origin[data-origin='igate-is2rf'],
+:root[data-theme="neon-signal"] .pkt-b-origin[data-origin='igate-rf2is'] { background:#a855f7; color:#fff; }

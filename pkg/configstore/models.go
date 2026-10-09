@@ -223,6 +223,7 @@ const (
 	KissTypeSerial    = "serial"
 	KissTypeBluetooth = "bluetooth"
 	KissTypeUsbSerial = "usbserial"
+	KissTypeBLEDevice = "ble-device" // direct BLE to KISS TNC
 )
 
 // Channel.Mode values. Default is ChannelModeAPRS to preserve current
@@ -249,7 +250,7 @@ func ValidChannelMode(m string) bool {
 // of the KISS TCP-client + channel-backing plan.
 func ValidKissInterfaceType(t string) bool {
 	switch t {
-	case KissTypeTCP, KissTypeTCPClient, KissTypeSerial, KissTypeBluetooth, KissTypeUsbSerial:
+	case KissTypeTCP, KissTypeTCPClient, KissTypeSerial, KissTypeBluetooth, KissTypeUsbSerial, KissTypeBLEDevice:
 		return true
 	}
 	return false
@@ -359,7 +360,7 @@ type DigipeaterBlocklist struct {
 type IGateConfig struct {
 	ID              uint32    `gorm:"primaryKey;autoIncrement" json:"id"`
 	Enabled         bool      `gorm:"not null;default:false" json:"enabled"`
-	Server          string    `gorm:"not null;default:'rotate.aprs2.net'" json:"server"`
+	Server          string    `gorm:"not null;default:'euro.aprs2.net'" json:"server"`
 	Port            uint32    `gorm:"not null;default:14580" json:"port"`
 	ServerFilter    string    `json:"server_filter"` // APRS-IS server-side filter expression
 	SimulationMode  bool      `gorm:"not null;default:false" json:"simulation_mode"`
@@ -391,7 +392,7 @@ type IGateRfFilter struct {
 	Pattern   string    `gorm:"not null" json:"pattern"`
 	Action    string    `gorm:"not null;default:'allow'" json:"action"` // allow|deny
 	Priority  uint32    `gorm:"not null;default:100" json:"priority"`
-	Enabled   bool      `gorm:"not null;default:true" json:"enabled"`
+	Enabled   bool      `gorm:"not null;default:false" json:"enabled"`
 	CreatedAt time.Time `json:"-"`
 	UpdatedAt time.Time `json:"-"`
 }

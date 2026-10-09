@@ -1,0 +1,83 @@
+/*
+ * Signal -- a more colorful light palette for Graywolf.
+ * Blue drives primary actions, teal is the secondary accent, and packet/status
+ * chips deliberately span distinct hues for quick scanning without sacrificing
+ * text contrast.
+ */
+:root:root[data-theme="signal"] {
+  --color-bg: #f7f8fc;
+  --color-surface: #ffffff;
+  --color-surface-raised: #eef2ff;
+  --color-border: #cbd5e1;
+  --color-border-subtle: #e2e8f0;
+  --color-text: #0f172a;
+  --color-text-muted: #475569;
+  --color-text-dim: #5f6f85;
+  --color-text-inverse: #ffffff;
+
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-muted: rgba(37, 99, 235, 0.12);
+  --color-primary-fg: #ffffff;
+  --color-accent: #0f766e;
+
+  --color-danger: #be123c;
+  --color-danger-hover: #9f1239;
+  --color-danger-muted: rgba(190, 18, 60, 0.12);
+  --color-danger-fg: #ffffff;
+  --color-success: #0f766e;
+  --color-success-fill: #0f766e;
+  --color-success-muted: rgba(15, 118, 110, 0.13);
+  --color-success-fg: #ffffff;
+  --color-warning: #b45309;
+  --color-warning-muted: rgba(180, 83, 9, 0.13);
+  --color-warning-fg: #ffffff;
+  --color-info: #0369a1;
+  --color-info-muted: rgba(3, 105, 161, 0.13);
+  --color-info-fg: #ffffff;
+
+  --color-btn-bg: #eef2f7;
+  --color-btn-bg-hover: #e2e8f0;
+  --color-btn-border: #cbd5e1;
+  --font-mono: 'Inconsolata', 'Courier New', monospace;
+  --radius: 6px;
+
+  --map-overlay-bg: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  --map-overlay-blur: 10px;
+  --map-overlay-fg: var(--color-text);
+  --map-overlay-muted: var(--color-text-muted);
+  --map-overlay-border: var(--color-border);
+  --map-overlay-shadow: 0 4px 18px rgba(15, 23, 42, 0.24);
+  --map-attribution-bg: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  --map-temp-fg: #f8fafc;
+  --map-temp-bg: rgba(15, 23, 42, 0.86);
+  --map-temp-border: rgba(255, 255, 255, 0.48);
+}
+
+:root[data-theme="signal"] .badge {
+  border-color: transparent;
+}
+:root[data-theme="signal"] .badge-success { background: #0f766e; color: #ffffff; border-color: #0f766e; }
+:root[data-theme="signal"] .badge-warning { background: #b45309; color: #ffffff; border-color: #b45309; }
+:root[data-theme="signal"] .badge-danger  { background: #be123c; color: #ffffff; border-color: #be123c; }
+:root[data-theme="signal"] .badge-info    { background: #0369a1; color: #ffffff; border-color: #0369a1; }
+
+:root[data-theme="signal"] .pkt-b-type[data-type='position']     { background: #2563eb; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-type[data-type='weather']      { background: #0f766e; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-type[data-type='telemetry']    { background: #b45309; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-type[data-type='message']      { background: #0369a1; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-type[data-type='object']       { background: #7c3aed; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-type[data-type='item']         { background: #15803d; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-type[data-type='mic-e']        { background: #be123c; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-type[data-type='status']       { background: #475569; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-type[data-type='capabilities'] { background: #6d28d9; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-type[data-type='df-report'],
+:root[data-theme="signal"] .pkt-b-type[data-type='query']        { background: #c2410c; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-type[data-type='third-party'],
+:root[data-theme="signal"] .pkt-b-type[data-type='unknown']      { background: #64748b; color: #ffffff; }
+
+:root[data-theme="signal"] .pkt-b-origin[data-origin='bcn']          { background: #c2410c; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-origin[data-origin='digi']         { background: #2563eb; color: #ffffff; }
+:root[data-theme="signal"] .pkt-b-origin[data-origin='igate'],
+:root[data-theme="signal"] .pkt-b-origin[data-origin='igate-is2rf'],
+:root[data-theme="signal"] .pkt-b-origin[data-origin='igate-rf2is'] { background: #7c3aed; color: #ffffff; }

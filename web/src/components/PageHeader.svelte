@@ -39,5 +39,12 @@
     display: flex;
     gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .header-text {
+    min-width: 0;
   }
 </style>

@@ -18,6 +18,13 @@ val graywolfVersionCode: Int = run {
     major * 1_000_000 + minor * 10_000 + patch * 100
 }
 
+// GitHub Actions exposes the exact source revision as GITHUB_SHA. Inject it
+// into the embedded Go backend together with VERSION so /api/version can
+// identify the exact APK under test. Local builds without GITHUB_SHA remain
+// explicitly "unknown" rather than pretending to be a different revision.
+val graywolfGitCommit: String =
+    System.getenv("GITHUB_SHA")?.takeIf { it.isNotBlank() } ?: "unknown"
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -286,6 +293,8 @@ goAbiMatrix.forEach { (abi, info) ->
         doFirst { outDir.mkdirs() }
         commandLine = listOf(
             "go", "build",
+            "-ldflags",
+            "-X main.Version=$graywolfVersionName -X main.GitCommit=$graywolfGitCommit",
             "-o", outDir.resolve("libgraywolf.so").absolutePath,
             "./cmd/graywolf",
         )

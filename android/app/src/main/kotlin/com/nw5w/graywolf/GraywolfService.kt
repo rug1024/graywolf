@@ -24,14 +24,17 @@ import android.util.Log
 import java.net.Inet6Address
 import com.nw5w.graywolf.BuildConfig
 import com.nw5w.graywolf.audio.AudioPump
+import com.nw5w.graywolf.audio.AudioConfigGate
 import com.nw5w.graywolf.audio.AudioTxPump
 import com.nw5w.graywolf.binaries.GoLauncher
 import com.nw5w.graywolf.binaries.Supervisor
 import com.nw5w.graywolf.gps.GpsAdapter
 import com.nw5w.graywolf.jni.ModemBridge
+import com.nw5w.graywolf.platformsvc.BleAdapter
 import com.nw5w.graywolf.platformsvc.BtSerialAdapter
 import com.nw5w.graywolf.platformsvc.BindContendedException
 import com.nw5w.graywolf.platformsvc.PlatformServer
+import com.nw5w.graywolf.platformsvc.SystemBleFacade
 import com.nw5w.graywolf.platformsvc.SystemBluetoothFacade
 import com.nw5w.graywolf.platformsvc.SystemUsbSerialFacade
 import com.nw5w.graywolf.platformsvc.UsbDeviceLister
@@ -60,6 +63,7 @@ class GraywolfService : Service() {
     // partial state instead of finishing a boot that's about to be torn down.
     @Volatile private var stopping = false
     private var btSerialAdapter: BtSerialAdapter? = null
+    private var bleAdapter: BleAdapter? = null
     private var usbSerialAdapter: UsbSerialAdapter? = null
     private val supervisor = Supervisor(
         onRestart = ::supervisorRestart,
@@ -152,6 +156,11 @@ class GraywolfService : Service() {
         }
     }
 
+    private fun shouldRunAudioCapture(): Boolean =
+        AudioConfigGate.requiresMicrophone(this) &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+                PackageManager.PERMISSION_GRANTED
+
     private fun bootModem(): Boolean {
         val rc = ModemBridge.modemStart(socketPath(), /* gainDb = */ -6.0f)
         if (rc != 0) {
@@ -211,7 +220,7 @@ class GraywolfService : Service() {
         goLauncher?.stop()
         ModemBridge.modemStop()
         if (!bootModem()) return false
-        audioPump.start()
+        if (shouldRunAudioCapture()) audioPump.start()
         return bootGoChild()
     }
 
@@ -282,10 +291,22 @@ class GraywolfService : Service() {
             this, 0, stopIntent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+        // Tapping the persistent foreground notification should behave exactly
+        // like tapping the launcher icon: bring the existing MainActivity to
+        // the foreground. FLAG_ACTIVITY_SINGLE_TOP avoids creating another
+        // activity when Graywolf is already open.
+        val openPending = PendingIntent.getActivity(
+            this, 1,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
         val notif: Notification = Notification.Builder(this, getString(R.string.notification_channel_id))
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(getString(R.string.notification_text))
             .setSmallIcon(R.drawable.ic_notification)
+            .setContentIntent(openPending)
             .addAction(
                 Notification.Action.Builder(
                     Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
@@ -295,21 +316,21 @@ class GraywolfService : Service() {
             )
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // Phase 4a adds LOCATION FGS type alongside MICROPHONE.
-            // Android 14 throws SecurityException if we declare an FGS
-            // type whose paired access perm is denied at runtime, so
-            // only include FGS_TYPE_LOCATION when ACCESS_FINE_LOCATION
-            // is actually granted. RECORD_AUDIO is always granted by
-            // this point (MainActivity.ensurePerms gates the launch).
-            var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            // Only claim the MICROPHONE FGS type when an enabled audio-backed
+            // channel exists and RECORD_AUDIO is granted. KISS Network/BLE-KISS
+            // must run without microphone access or the privacy indicator.
+            var fgsType = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            if (shouldRunAudioCapture()) {
+                fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            } else {
+                Log.i(TAG, "no active audio input; starting FGS without MICROPHONE type")
+            }
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
                 fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             } else {
                 Log.i(TAG, "ACCESS_FINE_LOCATION denied; starting FGS without location type")
             }
-            // MEDIA_PLAYBACK pairs with no runtime perm; always safe to include.
-            fgsType = fgsType or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
             // Per spec §3.6 + Android 14: CONNECTED_DEVICE FGS type requires that
             // at least one USB device has been granted permission at start time, or
             // startForeground throws SecurityException. Probe with UsbManager
@@ -370,7 +391,7 @@ class GraywolfService : Service() {
             platformServer = PlatformServer(
                 socketPath = platformSocketPath(),
                 serverVersion = BuildConfig.VERSION_NAME,
-                schemaVersion = 3,
+                schemaVersion = 4,
             ).also { it.start() }
         } catch (e: BindContendedException) {
             // A previous instance still owns the platformsvc socket after the
@@ -402,6 +423,15 @@ class GraywolfService : Service() {
             facade = btFacade,
             sendMessage = { msg -> platformServer!!.broadcastBt(msg) },
         ).also { platformServer!!.attachBtAdapter(it) }
+
+        // BLE KISS TNC adapter (Mobilinkd TNC3/TNC4 and NUS-based radios).
+        // Wired AFTER PlatformServer.start() for the same sendMessage reason.
+        // Tolerates a missing BluetoothAdapter: SystemBleFacade no-ops startScan.
+        bleAdapter = BleAdapter(
+            facade = SystemBleFacade(btManager?.adapter, applicationContext),
+            appContext = applicationContext,
+            sendMessage = { msg -> platformServer!!.broadcastBt(msg) },
+        ).also { platformServer!!.attachBleAdapter(it) }
 
         // USB serial KISS TNC adapter (sibling of btSerialAdapter). Same
         // post-start() wiring because its sendMessage closes over broadcastBt.
@@ -441,7 +471,7 @@ class GraywolfService : Service() {
                 ModemBridge.modemStop()
                 return@thread
             }
-            audioPump.start()
+            if (shouldRunAudioCapture()) audioPump.start()
             if (!bootGoChild()) {              // Correction 1: never orphans the Go child now
                 audioPump.stop()
                 ModemBridge.modemStop()
@@ -468,19 +498,21 @@ class GraywolfService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    // Swiping the app from recents removes the Activity but, with
-    // android:stopWithTask unset (default false), the foreground service
-    // keeps running and so would the forked Go backend. Stop ourselves so
-    // onDestroy's full teardown runs (supervisor, Go child SIGTERM, modem,
-    // audio, USB PTT, platform server). A fresh launch then rebuilds the
-    // service -- re-enumerating USB and rebooting the modem -- which is
-    // also exactly what hot-swap recovery needs.
+    // Swiping Graywolf from recents normally removes only the UI. The
+    // foreground service, BLE/KISS links and APRS backend keep running by
+    // default. Operators who prefer swipe-to-stop can disable "Keep running
+    // in background" in Preferences. The notification's Stop action always
+    // calls stopSelf() independently of this setting.
     override fun onTaskRemoved(rootIntent: Intent?) {
-        Log.i(TAG, "onTaskRemoved: task swiped away, stopping service")
+        if (MainActivity.keepRunningInBackground(this)) {
+            Log.i(TAG, "onTaskRemoved: task swiped away; background operation enabled")
+            super.onTaskRemoved(rootIntent)
+            return
+        }
+
+        Log.i(TAG, "onTaskRemoved: task swiped away; background operation disabled, stopping service")
         // Mark this as a deliberate stop so the USB_DEVICE_ATTACHED relaunch
-        // caused by our own teardown releasing the radio (the interfaces
-        // re-enumerate ~2s later) is suppressed in MainActivity rather than
-        // silently reviving the station the operator just dismissed.
+        // caused by teardown releasing the radio is suppressed in MainActivity.
         MainActivity.markUserStopped(this)
         stopSelf()
         super.onTaskRemoved(rootIntent)
@@ -529,6 +561,8 @@ class GraywolfService : Service() {
         // -- it MUST run before platformServer.stop() tears the socket down.
         btSerialAdapter?.shutdown()
         btSerialAdapter = null
+        bleAdapter?.shutdown()
+        bleAdapter = null
         usbSerialAdapter?.shutdown()
         usbSerialAdapter = null
         platformServer?.stop()

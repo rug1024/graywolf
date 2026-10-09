@@ -128,6 +128,34 @@ jobs:
           key: gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
+      # Android's default debug keystore lives outside the repository. GitHub's
+      # hosted runners are ephemeral, so without persisting it every workflow
+      # run generates a new signing certificate and Android refuses to install
+      # the next debug APK as an update. Keep one branch-scoped debug keystore
+      # in the Actions cache so successive test APKs remain upgrade-compatible.
+      # The debug key is not a release credential and carries no trust value.
+      - name: Restore stable debug keystore
+        id: debug-keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.config/.android/debug.keystore
+          key: graywolf-debug-keystore-v1
+
+      - name: Create debug keystore on first run
+        if: steps.debug-keystore.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.config/.android
+          keytool -genkeypair -v \
+            -keystore ~/.config/.android/debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       # Diagnostic: prove the NDK clang wrappers are at the path Gradle
       # expects before invoking the build. Cheap insurance against silent
       # NDK-version drift.
@@ -137,6 +165,20 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
           echo "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT:-<unset>}"
           ls -1 "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/" | grep -E "^(x86_64|aarch64)-linux-android[0-9]+-clang$" | sort
+
+      - name: Run BLE/GPS Android unit tests
+        working-directory: android
+        # Keep the Kotlin/platform bridge tests introduced/affected by this
+        # integration live in CI. The wider host-JVM test tree also contains
+        # tests that exercise Android framework org.json stubs and is not yet
+        # clean under plain testDebugUnitTest without Robolectric; filtering the
+        # execution still compiles the complete test source set while avoiding
+        # unrelated pre-existing runtime-stub failures.
+        run: >
+          ./gradlew :app:testDebugUnitTest
+          --tests 'com.nw5w.graywolf.platformsvc.BleAdapterTest'
+          --tests 'com.nw5w.graywolf.gps.GpsAdapterTest'
+          --no-daemon --stacktrace
 
       - name: Build debug APK
         working-directory: android

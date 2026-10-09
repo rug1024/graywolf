@@ -19,7 +19,7 @@ import { toasts } from './stores.js';
 const DISMISS_KEY = 'dismissed-update';
 
 export const updates = (() => {
-  let enabled = $state(true);        // from GET /api/updates/config
+  let enabled = $state(false);       // from GET /api/updates/config
   let status = $state('pending');    // from GET /api/updates/status; default matches the backend's "no checker yet" fallback
   let current = $state('');
   let latest = $state('');

@@ -98,7 +98,7 @@ const (
 
 func (r KissRequest) Validate() error {
 	if !configstore.ValidKissInterfaceType(r.Type) {
-		return fmt.Errorf("type must be tcp, tcp-client, serial, bluetooth, or usbserial")
+		return fmt.Errorf("type must be tcp, tcp-client, serial, bluetooth, usbserial, or ble-device")
 	}
 	if r.Type == configstore.KissTypeTCP && r.TcpPort <= 0 {
 		return fmt.Errorf("tcp_port is required for tcp interfaces")
@@ -122,15 +122,22 @@ func (r KissRequest) Validate() error {
 			return fmt.Errorf("reconnect_init_ms %d must be <= reconnect_max_ms %d", r.ReconnectInitMs, r.ReconnectMaxMs)
 		}
 	}
-	if (r.Type == configstore.KissTypeSerial || r.Type == configstore.KissTypeBluetooth || r.Type == configstore.KissTypeUsbSerial) && r.SerialDevice == "" {
-		return fmt.Errorf("serial_device is required for serial/bluetooth/usbserial interfaces")
+	if (r.Type == configstore.KissTypeSerial ||
+		r.Type == configstore.KissTypeBluetooth ||
+		r.Type == configstore.KissTypeUsbSerial ||
+		r.Type == configstore.KissTypeBLEDevice) && r.SerialDevice == "" {
+		return fmt.Errorf("serial_device is required for serial/bluetooth/usbserial/ble-device interfaces")
 	}
+	// ble-device stores the selected BLE peripheral address in serial_device.
+	// Requiring it at the API boundary mirrors the UI guard and prevents a
+	// persisted enabled interface that can never connect.
 	// Bluetooth/RFCOMM has no baud rate (the radio link runs at its
 	// own modulation rate), so the BaudRate check only applies to
 	// real serial devices. wiring.go hardcodes BaudRate=0 for the
 	// bluetooth path; rejecting it here would deadlock valid POSTs.
 	// usbserial mirrors host serial: a real line speed is required
 	// (bluetooth RFCOMM has no baud, so it stays excluded).
+	// ble-device is also excluded: BLE has no host-side baud rate.
 	if (r.Type == configstore.KissTypeSerial || r.Type == configstore.KissTypeUsbSerial) && r.BaudRate == 0 {
 		return fmt.Errorf("baud_rate is required for serial/usbserial interfaces")
 	}
@@ -148,7 +155,9 @@ func (r KissRequest) Validate() error {
 	// so setting the flag with Mode=modem is meaningless and almost
 	// certainly a UI bug. Reject at the API boundary so the error
 	// lands with useful context rather than silently persisting.
-	if r.AllowTxFromGovernor && r.Mode != configstore.KissModeTnc {
+	// ble-device is always forced to mode=tnc in ToModel, so the
+	// cross-check would false-positive on an empty mode field; skip it.
+	if r.AllowTxFromGovernor && r.Mode != configstore.KissModeTnc && r.Type != configstore.KissTypeBLEDevice {
 		return fmt.Errorf("allow_tx_from_governor requires mode=%q (got %q)",
 			configstore.KissModeTnc, r.Mode)
 	}
@@ -175,10 +184,15 @@ func (r KissRequest) ToModel() configstore.KissInterface {
 	mode := r.Mode
 	allowTx := r.AllowTxFromGovernor
 	if mode == "" {
-		if r.Type == configstore.KissTypeTCPClient {
+		switch r.Type {
+		case configstore.KissTypeTCPClient:
+			// Outbound TNC: default to TNC mode with governor TX enabled.
 			mode = configstore.KissModeTnc
 			allowTx = true
-		} else {
+		case configstore.KissTypeBLEDevice:
+			// BLE TNC always owns the modem; mode is always tnc.
+			mode = configstore.KissModeTnc
+		default:
 			mode = configstore.KissModeModem
 		}
 	}

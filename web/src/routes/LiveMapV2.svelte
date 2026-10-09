@@ -24,6 +24,7 @@
   import {
     radarManifestUrlForRegion,
     parseManifestFramesForRegion,
+    RADAR_REGION_OFF,
     RADAR_REGION_WORLD,
   } from '../lib/map/sources/radar-source.js';
   // Fronts layer disabled for now -- see commented-out wiring below to re-enable.
@@ -161,6 +162,7 @@
     console.warn(...args);
   }
   async function loadRadarFrames() {
+    if (mapState.radarRegion === RADAR_REGION_OFF) return [];
     if (!mapsState.registered) return [];
     if (!radarToken) radarToken = await mapsState.revealToken();
     if (!radarToken) return [];
@@ -643,7 +645,7 @@
     // the GL stack. DOM layers (stations, weather) always render above the
     // canvas regardless, but GL line layers (trails) would otherwise cover it.
     radarLayer = mountRadarLayer(map, {
-      visible: radarSettings.visible,
+      visible: radarSettings.visible && mapState.radarRegion !== RADAR_REGION_OFF,
       opacity: radarSettings.opacity,
       region: mapState.radarRegion,
       // The manifest poll often resolves before the basemap style loads (tiny
@@ -985,7 +987,7 @@
     radarLayer?.setVisible(v);
     // Only poll the loop manifest while the overlay is on; pause playback when
     // it is hidden so the timer isn't running unseen.
-    if (v) {
+    if (v && mapState.radarRegion !== RADAR_REGION_OFF) {
       radarFrames.startPolling();
     } else {
       radarFrames.pause();
@@ -1015,14 +1017,21 @@
   let radarRegionApplied = mapState.radarRegion;
   $effect(() => {
     const region = mapState.radarRegion;
-    radarLayer?.setRegion(region);
+    if (region === RADAR_REGION_OFF) {
+      radarLayer?.setVisible(false);
+      radarFrames.pause();
+      radarFrames.stopPolling();
+    } else {
+      radarLayer?.setRegion(region);
+      radarLayer?.setVisible(radarSettings.visible);
+    }
     if (region !== radarRegionApplied) {
       radarRegionApplied = region;
       // The frame ts namespace changed (US contour vs RainViewer): drop the old
       // loop and immediately re-poll the new region's manifest so the slider and
       // overlay don't briefly animate the wrong region's frames.
       radarFrames.reset();
-      if (radarSettings.visible) radarFrames.startPolling();
+      if (radarSettings.visible && region !== RADAR_REGION_OFF) radarFrames.startPolling();
     }
   });
   $effect(() => {

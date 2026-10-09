@@ -22,13 +22,13 @@
   // Phase 3B removed them from the iGate DTO, and the PUT decoder uses
   // DisallowUnknownFields so sending them triggers a 400.
   let form = $state({
-    enabled: true, server: 'rotate.aprs2.net', port: '14580',
+    enabled: true, server: 'euro.aprs2.net', port: '14580',
     server_filter: '', tx_channel: 0,
     simulation_mode: false, gate_rf_to_is: true, gate_is_to_rf: false,
     rf_channel: 0, is_tx_via: '', software_name: 'graywolf', software_version: '0.1',
   });
   let loading = $state(false);
-  let serverSelection = $state('rotate.aprs2.net');
+  let serverSelection = $state('euro.aprs2.net');
   let customServer = $state('');
 
   function handleServerSelection(next) {

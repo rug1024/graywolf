@@ -11,6 +11,7 @@
   import { Protocol } from 'pmtiles';
   import { URLShieldRenderer } from '@americana/maplibre-shield-generator';
   import { mapsState } from '../settings/maps-store.svelte.js';
+  import { unitsState } from '../settings/units-store.svelte.js';
   import { osmRasterStyle } from './sources/osm-raster.js';
   import { downloadsState } from '../maps/downloads-store.svelte.js';
   import { catalogStore } from '../maps/catalog-store.svelte.js';
@@ -28,6 +29,7 @@
 
   let container;
   let map = null;
+  let scaleControl = null;
   let bearerToken = $state(null);
   // Set in onDestroy. The onMount below is async and only creates the map
   // after several awaited fetches; if the operator navigates away during
@@ -193,19 +195,22 @@
   }
 
   onMount(async () => {
-    catalogStore.load(); // fire-and-forget; picker uses these
-    localBoundsStore.load(); // fire-and-forget; render path uses these
     ensureGwTileProtocol();
-    // Hydrate mapsState + downloadsState before the first style build
-    // so the first paint reflects the persisted source choice and any
-    // already-downloaded states. Without this, mapsState.source defaults
-    // to 'osm' on a direct page-load to /map even when the operator has
-    // selected Graywolf in settings, and the very first style is OSM.
-    await Promise.all([
-      mapsState.fetchConfig(),
-      downloadsState.refresh(),
-    ]);
-    await syncToken();
+    // Hydrate the persisted map-source choice first. Graywolf's catalog,
+    // local-bounds, download list, and token belong exclusively to the
+    // private/offline map path; an OSM session must not touch that maps
+    // infrastructure at all.
+    await mapsState.fetchConfig();
+    if (mapsState.source === 'graywolf') {
+      await Promise.all([
+        catalogStore.load(),
+        localBoundsStore.load(),
+        downloadsState.refresh(),
+      ]);
+      await syncToken();
+    } else {
+      bearerToken = null;
+    }
     const initialStyle = await buildStyle();
     // The operator may have navigated away while the awaits above were in
     // flight; onDestroy has already run. Don't build a map that will never
@@ -232,10 +237,11 @@
       }),
       'top-right',
     );
-    map.addControl(
-      new maplibregl.ScaleControl({ maxWidth: 100, unit: 'imperial' }),
-      'bottom-left',
-    );
+    scaleControl = new maplibregl.ScaleControl({
+      maxWidth: 100,
+      unit: unitsState.isMetric ? 'metric' : 'imperial',
+    });
+    map.addControl(scaleControl, 'bottom-left');
     // Wire up the americana highway-shield generator. The americana
     // style references runtime-generated shield images via image IDs
     // like "shield\nUS:I\n70\n" -- one styleimagemissing event per
@@ -361,6 +367,14 @@
       });
   });
 
+  // Keep MapLibre's scale bar in sync with the global units preference.
+  // ScaleControl does not observe application state by itself; setUnit()
+  // updates the existing control without remounting the map.
+  $effect(() => {
+    const unit = unitsState.isMetric ? 'metric' : 'imperial';
+    scaleControl?.setUnit(unit);
+  });
+
   // When registered flips, refresh the token.
   $effect(() => {
     const _ = mapsState.registered;
@@ -414,6 +428,14 @@
   :global(.maplibregl-ctrl-attrib a) {
     color: var(--map-overlay-fg) !important;
   }
+  /* Compass: keep north visually unambiguous across every theme. MapLibre's
+     stock compass uses a dark north needle which is easy to misread on our
+     themed controls. Replace only the icon artwork; control behaviour stays
+     native (drag to rotate, tap to reset north). */
+  :global(.maplibregl-ctrl-compass .maplibregl-ctrl-icon) {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2029%2029'%3E%3Cpath%20fill='%23e53935'%20d='M14.5%203.5l5.5%2011h-5.5z'/%3E%3Cpath%20fill='%23858b94'%20d='M14.5%2025.5l-5.5-11h5.5z'/%3E%3C/svg%3E") !important;
+  }
+
   /* Hide MapLibre's +/- zoom buttons on touch viewports — pinch-zoom
      is sufficient and the buttons would clash with the FAB. Keep the
      compass so operators can still reset bearing after a rotate. */
