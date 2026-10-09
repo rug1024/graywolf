@@ -422,7 +422,7 @@
   .readiness-row {
     display: flex;
     gap: 10px;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
   }
   .ready-chip {
@@ -447,24 +447,24 @@
   .channel-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 16px;
-    margin-bottom: 16px;
+    gap: 12px;
+    margin-bottom: 12px;
   }
   .ch-card {
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     background: var(--color-bg);
-    padding: 16px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 6px;
   }
   .ch-header {
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 4px;
   }
   .ch-title {
     font-size: 15px;
@@ -477,8 +477,8 @@
     letter-spacing: 0.03em;
   }
 
-  .kiss-links { display: flex; flex-direction: column; gap: 8px; }
-  .kiss-link { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+  .kiss-links { display: flex; flex-direction: column; gap: 4px; }
+  .kiss-link { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
   .kiss-state { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--color-text-muted); }
   .kiss-dot { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
   .kiss-state.connected { color: var(--color-success, #3fb950); }
@@ -572,14 +572,14 @@
   .stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 12px;
   }
   .stat-card {
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
     background: var(--color-bg);
-    padding: 12px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -612,7 +612,7 @@
 
   /* ── packet feed wrapper ───────────────────────── */
   .feed-section {
-    margin-top: 16px;
+    margin-top: 12px;
   }
   .empty {
     color: var(--color-text-dim);
