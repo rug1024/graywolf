@@ -1,6 +1,7 @@
 package igate
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strings"
@@ -23,7 +24,12 @@ func encodeTNC2(pkt *aprs.DecodedAPRSPacket, igateCall string) (string, error) {
 	if pkt.Source == "" || pkt.Dest == "" {
 		return "", errors.New("igate: packet missing source or dest")
 	}
-	info := infoBytes(pkt)
+	// APRS-IS uses CRLF as its TNC2 line delimiter. Some radios put
+	// CR or CRLF at the end of the RF info field; carrying that
+	// terminator into the TCP line would produce CR-CRLF or an extra
+	// blank line. Preserve all internal bytes, trimming only terminal
+	// CR/LF before the APRS-IS writer appends its own CRLF.
+	info := bytes.TrimRight(infoBytes(pkt), "\r\n")
 	if len(info) == 0 {
 		return "", errors.New("igate: packet has no info field")
 	}
