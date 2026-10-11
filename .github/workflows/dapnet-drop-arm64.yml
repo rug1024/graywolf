@@ -1,10 +1,11 @@
-name: Graywolf Custom Filters ARM64
+name: Graywolf 0.14.14-mod ARM64
 
 on:
   push:
     branches:
       - feature/drop-dapnet-pocsag-everywhere
       - feature/block-db0sda-rf-to-is
+      - feature/igate-mod-crlf
   workflow_dispatch:
 
 permissions:
@@ -45,14 +46,14 @@ jobs:
           CGO_ENABLED: '0'
         run: |
           mkdir -p dist-pi
-          go build -trimpath -ldflags="-s -w -X main.Version=0.14.14-igatefix-blocklist -X main.GitCommit=${GITHUB_SHA::8}" -o dist-pi/graywolf ./cmd/graywolf/
+          go build -trimpath -ldflags="-s -w -X main.Version=0.14.14-mod -X main.GitCommit=${GITHUB_SHA::8}" -o dist-pi/graywolf ./cmd/graywolf/
           file dist-pi/graywolf
           sha256sum dist-pi/graywolf > dist-pi/sha256.txt
 
       - name: Upload ARM64 binary
         uses: actions/upload-artifact@v5
         with:
-          name: graywolf-rf-to-is-blocklist-linux-arm64
+          name: graywolf-0.14.14-mod-linux-arm64
           path: dist-pi/
           if-no-files-found: error
           retention-days: 14
