@@ -41,15 +41,10 @@ func ParseRFToISBlocklist(input string) (string, error) {
 			if ssid > 15 {
 				return "", fmt.Errorf("rf_to_is_blocklist: SSID above 15 in %q", token)
 			}
-			// Explicit zero SSID is the normal base callsign on AX.25.
-			// Normalize it to the base form to avoid a misleading
-			// special-case that never matches plain source addresses.
-			if ssid == 0 {
-				call = strings.SplitN(call, "-", 2)[0]
-			} else {
-				base := strings.SplitN(call, "-", 2)[0]
-				call = fmt.Sprintf("%s-%d", base, ssid)
-			}
+			// Keep explicit -0 distinct from a bare callsign: -0
+			// means only SSID 0, while bare K1ABC matches all SSIDs.
+			base := strings.SplitN(call, "-", 2)[0]
+			call = fmt.Sprintf("%s-%d", base, ssid)
 		}
 		if _, ok := unique[call]; ok { continue }
 		unique[call] = struct{}{}
@@ -83,6 +78,9 @@ func (b *rfToISBlocklist) blocks(source string) bool {
 	}
 	source = strings.ToUpper(strings.TrimSpace(source))
 	if _, ok := b.exact[source]; ok { return true }
+	if !strings.Contains(source, "-") {
+		if _, ok := b.exact[source+"-0"]; ok { return true }
+	}
 	base, _, _ := strings.Cut(source, "-")
 	_, ok := b.base[base]
 	return ok
