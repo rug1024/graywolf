@@ -56,7 +56,7 @@ func TestEncodeTNC2AppendsQAR(t *testing.T) {
 
 func TestEncodeTNC2RejectsMissingInfo(t *testing.T) {
 	pkt := &aprs.DecodedAPRSPacket{Source: "KE7XYZ", Dest: "APRS"}
-	if _, err := encodeTNC2(pkt, "W5XYZ-10"); err == nil {
+	if _, err := encodeTNC2(pkt, "W5XYZ-10", "qAR"); err == nil {
 		t.Fatal("expected error for packet with no Raw info")
 	}
 }
