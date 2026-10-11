@@ -480,6 +480,11 @@ func (ig *Igate) handleISLine(line string) {
 		ig.logger.Debug("aprs-is tnc2 parse failed", "err", err, "line", line)
 		return
 	}
+	// Drop DAPNET before the packet-log hook, station cache, messages
+	// router, IS→RF governor and all other local IS consumers.
+	if aprs.IsDAPNETFrame(frame) {
+		return
+	}
 	// Decode just enough to evaluate rules (filter engine reads
 	// Source/Message/Object on the decoded struct).
 	pkt, err := aprs.Parse(frame)
@@ -706,6 +711,7 @@ type GateReason string
 
 const (
 	GateReasonNilPacket   GateReason = "nil-packet"
+	GateReasonDAPNET      GateReason = "dapnet-pocsag-blocked"
 	GateReasonThirdParty  GateReason = "third-party"
 	GateReasonPathBlocks  GateReason = "path-blocks"
 	GateReasonSelfMessage GateReason = "self-message"
@@ -723,6 +729,11 @@ const (
 func (ig *Igate) gateRFToIS(pkt *aprs.DecodedAPRSPacket) GateReason {
 	if pkt == nil {
 		return GateReasonNilPacket
+	}
+	// Defence in depth: this path also receives KISS-client transmissions,
+	// not only frames handled by the RF receive fanout.
+	if frame, err := ax25.Decode(pkt.Raw); err == nil && aprs.IsDAPNETFrame(frame) {
+		return GateReasonDAPNET
 	}
 	// Record every direct-RF arrival in the heard-direct tracker so
 	// the IS->RF gate knows which stations are in range for
@@ -851,6 +862,12 @@ func pathBlocksGating(path []string) bool {
 // beacon scheduler to duplicate a beacon to APRS-IS when the operator
 // has opted in. Returns an error if the igate is not connected.
 func (ig *Igate) SendLine(line string) error {
+	// Locally generated APRS-IS traffic bypasses gateRFToIS.
+	// The info portion starts after the first TNC2 ':' separator.
+	if colon := strings.IndexByte(line, ':'); colon >= 0 &&
+		aprs.IsDAPNETTraffic([]byte(line[colon+1:])) {
+		return errors.New("igate: DAPNET/POCSAG traffic blocked")
+	}
 	ig.mu.Lock()
 	connected := ig.connected
 	ig.mu.Unlock()
