@@ -97,3 +97,70 @@ func TestParseTNC2RejectsBadLine(t *testing.T) {
 		}
 	}
 }
+
+ 
+// TestEncodeTNC2LineFraming ports PR #10 regression coverage to the
+// qAO/qAR-aware iGate encoder. RF packet bytes must not be modified.
+func TestEncodeTNC2LineFraming(t *testing.T) {
+	for _, tc := range []struct {
+		name, in, want string
+	}{
+		{"plain", ">status", ">status"},
+		{"trailing CR", ">status\r", ">status"},
+		{"trailing LF", ">status\n", ">status"},
+		{"trailing CRLF", ">status\r\n", ">status"},
+		{"repeated terminators", ">status\r\n\r", ">status"},
+		{"embedded CR", ">status\rbody", ">status"},
+		{"embedded LF", ">status\nbody", ">status"},
+		{"binary control preserved", ">status\x1cbody\r", ">status\x1cbody"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := buildRawFrame(t, "DL9ABC-9", "APRS", nil, tc.in)
+			pkt := &aprs.DecodedAPRSPacket{
+				Source: "DL9ABC-9",
+				Dest: "APRS",
+				Raw: raw,
+			}
+			for _, q := range []string{"qAO", "qAR"} {
+				got, err := encodeTNC2(pkt, "DA6PG-1", q)
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := "DL9ABC-9>APRS," + q + ",DA6PG-1:" + tc.want
+				if got != want {
+					t.Errorf("q=%s got %q, want %q", q, got, want)
+				}
+			}
+			f, err := ax25.Decode(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := string(f.Info); got != tc.in {
+				t.Fatalf("RF AX.25 info changed: got %q, want %q", got, tc.in)
+			}
+		})
+	}
+}
+
+func TestEncodeTNC2KeepsRepeatedPathWhenSanitizing(t *testing.T) {
+	pkt := &aprs.DecodedAPRSPacket{
+		Source: "DB0XYZ-2",
+		Dest: "APRS",
+		Path: []string{"WIDE1-1*", "WIDE2-1*"},
+		Raw: buildRawFrame(t, "DB0XYZ-2", "APRS", []string{"WIDE1-1*", "WIDE2-1*"}, ">hello\r"),
+	}
+	got, err := encodeTNC2(pkt, "DA6PG-1", "qAO")
+	if err != nil { t.Fatal(err) }
+	const want = "DB0XYZ-2>APRS,WIDE1-1*,WIDE2-1*,qAO,DA6PG-1:>hello"
+	if got != want { t.Fatalf("got %q want %q", got, want) }
+}
+
+func TestEncodeTNC2RejectsEmptyInfoAfterCR(t *testing.T) {
+	pkt := &aprs.DecodedAPRSPacket{
+		Source: "DL9ABC-9", Dest: "APRS",
+		Raw: buildRawFrame(t, "DL9ABC-9", "APRS", nil, "\r>status"),
+	}
+	if _, err := encodeTNC2(pkt, "DA6PG-1", "qAO"); err == nil {
+		t.Fatal("expected empty sanitized info field to be rejected")
+	}
+}
