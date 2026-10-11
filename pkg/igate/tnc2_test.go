@@ -97,3 +97,36 @@ func TestParseTNC2RejectsBadLine(t *testing.T) {
 		}
 	}
 }
+
+func TestEncodeTNC2StripsOnlyRFLineTerminators(t *testing.T) {
+	tests := []struct {
+		name string
+		info string
+		want string
+	}{
+		{name: "plain", info: ">status", want: ">status"},
+		{name: "trailing CR", info: ">status\r", want: ">status"},
+		{name: "trailing LF", info: ">status\n", want: ">status"},
+		{name: "trailing CRLF", info: ">status\r\n", want: ">status"},
+		{name: "repeated trailing CRLF", info: ">status\r\n\r", want: ">status"},
+		{name: "interior CR preserved", info: ">status\rbody", want: ">status\rbody"},
+		{name: "interior control preserved", info: ">status\x1cbody\r", want: ">status\x1cbody"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pkt := &aprs.DecodedAPRSPacket{
+				Source: "DL9ABC-9",
+				Dest:   "APRS",
+				Raw:    buildRawFrame(t, "DL9ABC-9", "APRS", nil, tt.info),
+			}
+			got, err := encodeTNC2(pkt, "DA6PG-1")
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := "DL9ABC-9>APRS,qAR,DA6PG-1:" + tt.want
+			if got != want {
+				t.Fatalf("TNC2 output:\n got: %q\nwant: %q", got, want)
+			}
+		})
+	}
+}
