@@ -109,8 +109,9 @@ func TestEncodeTNC2StripsOnlyRFLineTerminators(t *testing.T) {
 		{name: "trailing LF", info: ">status\n", want: ">status"},
 		{name: "trailing CRLF", info: ">status\r\n", want: ">status"},
 		{name: "repeated trailing CRLF", info: ">status\r\n\r", want: ">status"},
-		{name: "interior CR preserved", info: ">status\rbody", want: ">status\rbody"},
-		{name: "interior control preserved", info: ">status\x1cbody\r", want: ">status\x1cbody"},
+		{name: "interior CR stops record", info: ">status\rbody", want: ">status"},
+		{name: "interior LF stops record", info: ">status\nbody", want: ">status"},
+		{name: "binary control preserved", info: ">status\x1cbody\r", want: ">status\x1cbody"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
