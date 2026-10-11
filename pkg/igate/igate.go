@@ -109,6 +109,8 @@ type Config struct {
 	// ServerFilter is the APRS-IS filter string passed at login time
 	// (e.g. "m/100" for a 100km radius around the station).
 	ServerFilter string
+	// RFToISBlocklist is a user-defined source denylist (base calls or specific SSIDs).
+	RFToISBlocklist string
 	// SoftwareName and SoftwareVersion appear in the login banner.
 	SoftwareName    string
 	SoftwareVersion string
@@ -196,6 +198,8 @@ type Igate struct {
 	stationCallsign string
 
 	filter atomic.Pointer[filters.Engine]
+	// Read without locks on RF receive; updated on live iGate reconfiguration.
+	rfToISBlocklist atomic.Pointer[rfToISBlocklist]
 	heard  *heardDirect
 
 	mu            sync.Mutex
@@ -289,6 +293,7 @@ func New(cfg Config) (*Igate, error) {
 		done:            make(chan struct{}),
 	}
 	ig.filter.Store(filters.New(cfg.Rules))
+	ig.rfToISBlocklist.Store(newRFToISBlocklist(cfg.RFToISBlocklist))
 	ig.sessCtx.Store(&sessCtxHolder{ctx: context.Background()})
 	ig.simulation.Store(cfg.SimulationMode)
 	ig.txChannel.Store(cfg.TxChannel)
@@ -731,13 +736,10 @@ func (ig *Igate) gateRFToIS(pkt *aprs.DecodedAPRSPacket) GateReason {
 	if pkt == nil {
 		return GateReasonNilPacket
 	}
-	// DA6PG-1 local opt-out: do not register as an APRS-IS iGate for DB0SDA.
-	// This is a source-only RF→IS rule: RF reception and packet logging
-	// are unchanged, while DB0SDA's APRS-IS entries stop acquiring our
-	// qAO/DA6PG-1 gateway tag. Also covers any DB0SDA SSID.
-	// Apply before the heard-direct tracker to keep the station out of
-	// our own IS→RF message-recipient set as well.
-	if blockedRFToISSource(pkt.Source) {
+	// User-configured RF→IS source exclusions are independent of the
+	// APRS-IS receive filter; keep excluded sources out of the local
+	// heard-direct tracker as well.
+	if ig.rfToISBlocklist.Load().blocks(pkt.Source) {
 		return GateReasonSourceBlock
 	}
 	// Defence in depth: this path also receives KISS-client transmissions,
@@ -855,14 +857,6 @@ func (ig *Igate) qConstructFor(pkt *aprs.DecodedAPRSPacket) string {
 	return "qAR"
 }
 
-// blockedRFToISSource is a deliberate DA6PG-1-specific rule, not a
-// generic APRS-IS server-side filter or a global receive block. Only
-// outgoing RF→IS uploads sourced from DB0SDA are suppressed.
-func blockedRFToISSource(call string) bool {
-	base, _, _ := strings.Cut(strings.TrimSpace(call), "-")
-	return strings.EqualFold(base, "DB0SDA")
-}
-
 func pathBlocksGating(path []string) bool {
 	for _, p := range path {
 		u := strings.ToUpper(strings.TrimSuffix(p, "*"))
@@ -904,6 +898,13 @@ func (ig *Igate) SendLine(line string) error {
 // connection is closed so the supervisor reconnects with the new
 // filter (which is sent at login time). Pass a non-nil governor to
 // enable IS→RF gating, or nil to disable it.
+// SetRFToISBlocklist applies new callsign exclusions without restarting
+// the APRS-IS session. Values are validated by the REST handler before
+// they are persisted to the database.
+func (ig *Igate) SetRFToISBlocklist(value string) {
+	ig.rfToISBlocklist.Store(newRFToISBlocklist(value))
+}
+
 func (ig *Igate) Reconfigure(serverFilter string, rules []filters.Rule, gov txgovernor.TxSink) {
 	ig.filter.Store(filters.New(rules))
 
