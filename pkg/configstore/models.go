@@ -362,6 +362,7 @@ type IGateConfig struct {
 	Server          string    `gorm:"not null;default:'rotate.aprs2.net'" json:"server"`
 	Port            uint32    `gorm:"not null;default:14580" json:"port"`
 	ServerFilter    string    `json:"server_filter"` // APRS-IS server-side filter expression
+	RFToISBlocklist string   `gorm:"column:rf_to_is_blocklist;type:text;not null;default:''" json:"rf_to_is_blocklist"` // per-line callsign exclusions from RF->IS (empty = no exclusions)
 	SimulationMode  bool      `gorm:"not null;default:false" json:"simulation_mode"`
 	GateRfToIs      bool      `gorm:"not null;default:true" json:"gate_rf_to_is"`
 	GateIsToRf      bool      `gorm:"not null;default:false" json:"gate_is_to_rf"`
