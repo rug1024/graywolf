@@ -44,7 +44,7 @@ jobs:
           CGO_ENABLED: '0'
         run: |
           mkdir -p dist-pi
-          go build -trimpath -ldflags="-s -w -X main.Version=igate-fix -X main.GitCommit=${GITHUB_SHA::8}" -o dist-pi/graywolf ./cmd/graywolf/
+          go build -trimpath -ldflags="-s -w -X main.Version=0.14.14-igatefix -X main.GitCommit=${GITHUB_SHA::8}" -o dist-pi/graywolf ./cmd/graywolf/
           file dist-pi/graywolf
           sha256sum dist-pi/graywolf > dist-pi/sha256.txt
 
