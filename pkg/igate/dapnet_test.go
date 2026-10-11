@@ -1,7 +1,6 @@
 package igate
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/chrissnell/graywolf/pkg/aprs"
@@ -42,7 +41,7 @@ func TestDAPNETRejectedForRFToISAndDirectIS(t *testing.T) {
 	if err := ig.SendLine("DB0SDA>APRS,TCPIP*:;P-TEST   *111403z5050.00NP00605.00E#DAPNET"); err == nil {
 		t.Fatal("direct APRS-IS upload of DAPNET content should be blocked")
 	}
-	if err := ig.SendLine("DB0SDA>APRS,TCPIP*:!5046.57NS00604.17E#PHG2140Aachen"); !errors.Is(err, errors.New("igate: not connected")) && err == nil {
+	if err := ig.SendLine("DB0SDA>APRS,TCPIP*:!5046.57NS00604.17E#PHG2140Aachen"); err == nil || err.Error() != "igate: not connected" {
 		t.Fatal("ordinary line should only fail due to offline connection")
 	}
 }
