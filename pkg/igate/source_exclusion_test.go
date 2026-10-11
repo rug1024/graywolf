@@ -7,57 +7,51 @@ import (
 	"github.com/chrissnell/graywolf/pkg/aprs"
 )
 
-func TestDB0SDAExclusionScope(t *testing.T) {
-	tests := []struct {
-		call string
-		want bool
-	}{
-		{"DB0SDA", true},
-		{"db0sda", true},
-		{"DB0SDA-2", true},
-		{" Db0SdA-10 ", true},
-		{"DB0SDAB", false},
-		{"DA6PG-7", false},
-		{"ON4MAX-2", false},
-		{"", false},
+// Source exclusions are configured by the operator; no station is
+// implicitly excluded by its callsign in an empty/new installation.
+func TestRFToISBlocklistDefaultsEmpty(t *testing.T) {
+	ig := mustIgate(t)
+	pkt := &aprs.DecodedAPRSPacket{
+		Source: "K1ABC",
+		Dest:   "APRS",
+		Type:   aprs.PacketPosition,
+		Raw:    buildRawFrame(t, "K1ABC", "APRS", nil, "!5046.57NS00604.17E#normal"),
 	}
-	for _, tt := range tests {
-		t.Run(tt.call, func(t *testing.T) {
-			if got := blockedRFToISSource(tt.call); got != tt.want {
-				t.Errorf("blockedRFToISSource(%q) = %t, want %t", tt.call, got, tt.want)
-			}
-		})
+	if got := ig.gateRFToIS(pkt); got != GateReasonOffline {
+		t.Fatalf("empty list blocked ordinary traffic: %q", got)
+	}
+	if !ig.heard.HeardWithin("K1ABC", 30*time.Minute) {
+		t.Fatal("station not recorded with empty blocklist")
 	}
 }
 
-func TestDB0SDANeverBecomesIGateRecipient(t *testing.T) {
+func TestRFToISBlocklistLiveReconfiguration(t *testing.T) {
 	ig := mustIgate(t)
-	for _, call := range []string{"DB0SDA", "db0sda-2"} {
+	ig.SetRFToISBlocklist("K1ABC\nW5XYZ-7")
+	check := func(call string, want GateReason) {
+		t.Helper()
 		pkt := &aprs.DecodedAPRSPacket{
 			Source: call,
-			Dest: "APRS",
-			Type: aprs.PacketPosition,
-			Raw: buildRawFrame(t, "DB0SDA", "APRS", nil, "!5046.57NS00604.17E#PHG2140Aachen"),
+			Dest:   "APRS",
+			Type:   aprs.PacketPosition,
+			Raw:    buildRawFrame(t, "K1ABC", "APRS", nil, "!5046.57NS00604.17E#normal"),
 		}
-		if got := ig.gateRFToIS(pkt); got != GateReasonSourceBlock {
-			t.Errorf("%s: outcome = %q, want %q", call, got, GateReasonSourceBlock)
+		if got := ig.gateRFToIS(pkt); got != want {
+			t.Errorf("%s: gate reason = %q, want %q", call, got, want)
 		}
 	}
-	// Other packets still reach the existing policy pipeline (offline
-	// here because the fake iGate has no live APRS-IS connection).
-	ordinary := &aprs.DecodedAPRSPacket{
-		Source: "ON4MAX-2",
-		Dest: "APRS",
-		Type: aprs.PacketPosition,
-		Raw: buildRawFrame(t, "ON4MAX-2", "APRS", nil, "!5046.57NS00604.17E#PHG2140Aachen"),
-	}
-	if got := ig.gateRFToIS(ordinary); got != GateReasonOffline {
-		t.Errorf("other station outcome = %q, want %q", got, GateReasonOffline)
-	}
-	if ig.heard.HeardWithin("DB0SDA", 30*time.Minute) {
-		t.Error("DB0SDA should not be admitted to local IS→RF heard-direct recipient tracker")
+	check("K1ABC", GateReasonSourceBlock)
+	check("K1ABC-2", GateReasonSourceBlock)
+	check("W5XYZ-7", GateReasonSourceBlock)
+	check("W5XYZ-9", GateReasonOffline)
+	check("ON4MAX-2", GateReasonOffline)
+
+	if ig.heard.HeardWithin("K1ABC", 30*time.Minute) {
+		t.Error("blocked station was recorded in local heard-direct tracker")
 	}
 	if !ig.heard.HeardWithin("ON4MAX-2", 30*time.Minute) {
-		t.Error("normal station was not recorded in the heard-direct tracker")
+		t.Error("ordinary station was not tracked")
 	}
+	ig.SetRFToISBlocklist("")
+	check("K1ABC", GateReasonOffline)
 }
