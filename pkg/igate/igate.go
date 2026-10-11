@@ -203,6 +203,10 @@ type Igate struct {
 	lastConnected time.Time
 	simulation    atomic.Bool
 
+	// rfToIsEnabled is the live RF→IS master switch, independent of the
+	// IS→RF message downlink configuration.
+	rfToIsEnabled atomic.Bool
+
 	// txChannel mirrors cfg.TxChannel but is mutable at runtime via
 	// SetTxChannel so an iGate-config save can retarget IS→RF without
 	// a daemon restart. Reads on the IS→RF hot path are lock-free.
@@ -291,6 +295,9 @@ func New(cfg Config) (*Igate, error) {
 	ig.filter.Store(filters.New(cfg.Rules))
 	ig.sessCtx.Store(&sessCtxHolder{ctx: context.Background()})
 	ig.simulation.Store(cfg.SimulationMode)
+	// Preserve the existing standalone iGate default. The orchestrator
+	// replaces it with the persisted master-switch value at construction.
+	ig.rfToIsEnabled.Store(true)
 	ig.txChannel.Store(cfg.TxChannel)
 	// Parse the IS→RF via-path once at construction. A malformed value
 	// (validated at save time, so normally unreachable) falls back to
@@ -706,6 +713,7 @@ type GateReason string
 
 const (
 	GateReasonNilPacket   GateReason = "nil-packet"
+	GateReasonDisabled    GateReason = "rf-to-is-disabled"
 	GateReasonThirdParty  GateReason = "third-party"
 	GateReasonPathBlocks  GateReason = "path-blocks"
 	GateReasonSelfMessage GateReason = "self-message"
@@ -732,6 +740,12 @@ func (ig *Igate) gateRFToIS(pkt *aprs.DecodedAPRSPacket) GateReason {
 	// frame yet (no '*' marker in the path).
 	if pkt.Source != "" && pathIsDirect(pkt.Path) {
 		ig.heard.Record(pkt.Source)
+	}
+	// The persisted RF→IS master switch must also gate KISS-client TX
+	// uploads, as both ingress paths share this function. Keep tracking
+	// directly heard stations for possible IS→RF messaging when disabled.
+	if !ig.rfToIsEnabled.Load() {
+		return GateReasonDisabled
 	}
 	// Rule: never gate third-party traffic (already came from the net).
 	if pkt.ThirdParty != nil || pkt.Type == aprs.PacketThirdParty {
@@ -848,6 +862,13 @@ func (ig *Igate) Reconfigure(serverFilter string, rules []filters.Rule, gov txgo
 		}
 	}
 	ig.logger.Info("igate reconfigured", "server_filter", serverFilter, "rules", len(rules))
+}
+
+// SetRFToISEnabled changes RF→APRS-IS forwarding without restarting the
+// iGate or interrupting its APRS-IS connection. The heard-direct tracker
+// remains active even while uplink is disabled.
+func (ig *Igate) SetRFToISEnabled(enabled bool) {
+	ig.rfToIsEnabled.Store(enabled)
 }
 
 // TxChannel returns the live IS→RF channel ID. Reads are lock-free.
