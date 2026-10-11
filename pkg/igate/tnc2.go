@@ -1,6 +1,7 @@
 package igate
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strings"
@@ -27,7 +28,14 @@ func encodeTNC2(pkt *aprs.DecodedAPRSPacket, igateCall, qConstruct string) (stri
 	if qConstruct != "qAR" && qConstruct != "qAO" {
 		return "", fmt.Errorf("igate: unsupported q construct %q", qConstruct)
 	}
+	// APRS-IS is line-oriented: CR or LF inside RF payload would split
+	// one packet into multiple TCP records. Only the outgoing record
+	// is sanitized; the received AX.25 frame and its logging stay intact.
+	// This ports PR #10 onto the qAO/qAR + H-bit preserving iGate path.
 	info := infoBytes(pkt)
+	if cut := bytes.IndexAny(info, "\r\n"); cut >= 0 {
+		info = info[:cut]
+	}
 	if len(info) == 0 {
 		return "", errors.New("igate: packet has no info field")
 	}
