@@ -100,3 +100,32 @@ func mustIgate(t *testing.T) *Igate {
 	}
 	return ig
 }
+
+func TestRFToISMasterSwitch(t *testing.T) {
+	ig := mustIgate(t)
+	out := NewIgateOutput(ig)
+	pkt := &aprs.DecodedAPRSPacket{
+		Source: "W5ABC-7",
+		Dest:   "APRS",
+		Raw:    buildRawFrame(t, "W5ABC-7", "APRS", nil, ">RF to IS toggle"),
+		Type:   aprs.PacketStatus,
+	}
+
+	// A disabled RF→IS switch blocks both ordinary RF ingress and
+	// KISS-client transmissions, independently of APRS-IS connectivity.
+	ig.SetRFToISEnabled(false)
+	if got := out.GateClientTx(context.Background(), pkt); got != GateReasonDisabled {
+		t.Fatalf("disabled RF→IS: got %q, want %q", got, GateReasonDisabled)
+	}
+	// Direct-heard tracking must still work for IS→RF messages, even
+	// when this independent uplink switch is disabled.
+	if !ig.heard.HeardWithin(pkt.Source, heardDirectTTL) {
+		t.Fatal("disabled uplink incorrectly prevented heard-direct tracking")
+	}
+
+	// A live toggle must take effect without rebuilding the iGate.
+	ig.SetRFToISEnabled(true)
+	if got := out.GateClientTx(context.Background(), pkt); got != GateReasonOffline {
+		t.Fatalf("re-enabled RF→IS should reach offline check: got %q", got)
+	}
+}
