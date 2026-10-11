@@ -765,7 +765,7 @@ func (ig *Igate) gateRFToIS(pkt *aprs.DecodedAPRSPacket) GateReason {
 		ig.mDroppedOffline.Inc()
 		return GateReasonOffline
 	}
-	line, err := encodeTNC2(pkt, ig.stationCallsign)
+	line, err := encodeTNC2(pkt, ig.stationCallsign, ig.qConstructFor(pkt))
 	if err != nil {
 		ig.logger.Debug("igate: encode tnc2 failed", "err", err)
 		return GateReasonEncodeFail
@@ -789,6 +789,49 @@ func (ig *Igate) gateRFToIS(pkt *aprs.DecodedAPRSPacket) GateReason {
 		ig.cfg.RfToIsHook(pkt, line)
 	}
 	return GateReasonGated
+}
+
+// qConstructFor advertises whether this particular RF sender is reachable
+// via our IS->RF message gateway. qAR is a promise of possible message
+// delivery, not merely proof that this host has a transmit-capable radio.
+// When reachability cannot be established, conservatively use qAO.
+func (ig *Igate) qConstructFor(pkt *aprs.DecodedAPRSPacket) string {
+	if pkt == nil || pkt.Source == "" || pkt.Channel <= 0 || !pathIsDirect(pkt.Path) {
+		return "qAO"
+	}
+
+	// The configured downlink can transmit only on its selected channel.
+	// In particular, hearing a station on LoRa does not make it reachable
+	// through an unrelated VHF AFSK downlink (or vice versa).
+	txChannel := ig.txChannel.Load()
+	if txChannel == 0 || uint32(pkt.Channel) != txChannel {
+		return "qAO"
+	}
+	ig.mu.Lock()
+	hasGovernor := ig.cfg.Governor != nil
+	ig.mu.Unlock()
+	if !hasGovernor {
+		return "qAO"
+	}
+	if ig.cfg.ChannelModes != nil {
+		mode, err := ig.cfg.ChannelModes.ModeForChannel(context.Background(), txChannel)
+		if err != nil || mode == configstore.ChannelModePacket {
+			return "qAO"
+		}
+	}
+
+	// An IS->RF filter with no matching message rule cannot deliver
+	// a reply. The sender of a future reply is unknown; checking an
+	// empty sender intentionally avoids making promises based only on
+	// an allowlist for some hypothetical Internet sender.
+	f := ig.filter.Load()
+	if f == nil || !f.Allow(&aprs.DecodedAPRSPacket{
+		Type:    aprs.PacketMessage,
+		Message: &aprs.Message{Addressee: pkt.Source},
+	}) {
+		return "qAO"
+	}
+	return "qAR"
 }
 
 func pathBlocksGating(path []string) bool {
