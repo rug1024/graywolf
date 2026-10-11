@@ -44,7 +44,7 @@ func TestEncodeTNC2AppendsQAR(t *testing.T) {
 		Path:   []string{"WIDE1-1", "WIDE2-1"},
 		Raw:    raw,
 	}
-	line, err := encodeTNC2(pkt, "W5XYZ-10")
+	line, err := encodeTNC2(pkt, "W5XYZ-10", "qAR")
 	if err != nil {
 		t.Fatal(err)
 	}
