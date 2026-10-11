@@ -48,6 +48,7 @@
   let savedConfig = $state(/** @type {null | object} */ (null));
   let enableSaving = $state(false);
   let gateIsToRfSaving = $state(false);
+  let gateRfToIsSaving = $state(false);
 
   // Station callsign (read-only on this page). Loaded alongside the
   // iGate config; failure is non-fatal — we treat a failed load as
@@ -517,6 +518,25 @@
     }
   }
 
+  // Master RF→IS gating toggle auto-save. Preserve unrelated unsaved
+  // fields by patching only the last persisted config snapshot, and
+  // revert the visible toggle if the API rejects the update.
+  async function autoSaveGateRfToIs(next) {
+    if (!savedConfig || next === savedConfig.gate_rf_to_is || gateRfToIsSaving) return;
+    gateRfToIsSaving = true;
+    try {
+      const body = { ...savedConfig, gate_rf_to_is: next };
+      await api.put('/igate/config', body);
+      savedConfig = body;
+      toasts.success(next ? 'RF→IS forwarding enabled' : 'RF→IS forwarding disabled');
+    } catch (err) {
+      form.gate_rf_to_is = savedConfig.gate_rf_to_is;
+      toasts.error(err.message || 'Failed to update RF→IS forwarding');
+    } finally {
+      gateRfToIsSaving = false;
+    }
+  }
+
   // Master IS→RF gating toggle auto-save. Like autoSaveEnabled, this
   // persists only the gate_is_to_rf bit merged onto the last-saved
   // snapshot, so it never commits unsaved edits to the other fields.
@@ -737,6 +757,18 @@
         onkeydown={handleEnableToggleKeydown}
         onCheckedChange={autoSaveEnabled}
       />
+      <div class="gate-master-toggle">
+        <Toggle
+          bind:checked={form.gate_rf_to_is}
+          label="Enable RF→IS forwarding"
+          onCheckedChange={autoSaveGateRfToIs}
+        />
+        <p class="field-note">
+          Forward eligible RF-heard APRS packets to APRS-IS. This is independent
+          of the IS→RF transmitter switch below; receive-only iGates normally
+          enable RF→IS and leave IS→RF disabled.
+        </p>
+      </div>
       <div style="margin-top: 16px;">
         <FormField label="APRS-IS Server" id="ig-server">
           <Select
