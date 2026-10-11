@@ -900,7 +900,6 @@ func (a *App) buildIgateInstance(ctx context.Context, igCfg *configstore.IGateCo
 		SoftwareVersion: igCfg.SoftwareVersion,
 		Rules:           rules,
 		TxChannel:       txCh,
-		ChannelModes:    a.store,
 		IsTxVia:         igCfg.IsTxVia,
 		Governor:        igGov,
 		SimulationMode:  igCfg.SimulationMode,
