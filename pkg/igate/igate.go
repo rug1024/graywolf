@@ -712,6 +712,7 @@ type GateReason string
 const (
 	GateReasonNilPacket   GateReason = "nil-packet"
 	GateReasonDAPNET      GateReason = "dapnet-pocsag-blocked"
+	GateReasonSourceBlock GateReason = "rf-to-is-source-blocked"
 	GateReasonThirdParty  GateReason = "third-party"
 	GateReasonPathBlocks  GateReason = "path-blocks"
 	GateReasonSelfMessage GateReason = "self-message"
@@ -729,6 +730,15 @@ const (
 func (ig *Igate) gateRFToIS(pkt *aprs.DecodedAPRSPacket) GateReason {
 	if pkt == nil {
 		return GateReasonNilPacket
+	}
+	// DA6PG-1 local opt-out: do not register as an APRS-IS iGate for DB0SDA.
+	// This is a source-only RF→IS rule: RF reception and packet logging
+	// are unchanged, while DB0SDA's APRS-IS entries stop acquiring our
+	// qAO/DA6PG-1 gateway tag. Also covers any DB0SDA SSID.
+	// Apply before the heard-direct tracker to keep the station out of
+	// our own IS→RF message-recipient set as well.
+	if blockedRFToISSource(pkt.Source) {
+		return GateReasonSourceBlock
 	}
 	// Defence in depth: this path also receives KISS-client transmissions,
 	// not only frames handled by the RF receive fanout.
@@ -843,6 +853,14 @@ func (ig *Igate) qConstructFor(pkt *aprs.DecodedAPRSPacket) string {
 		return "qAO"
 	}
 	return "qAR"
+}
+
+// blockedRFToISSource is a deliberate DA6PG-1-specific rule, not a
+// generic APRS-IS server-side filter or a global receive block. Only
+// outgoing RF→IS uploads sourced from DB0SDA are suppressed.
+func blockedRFToISSource(call string) bool {
+	base, _, _ := strings.Cut(strings.TrimSpace(call), "-")
+	return strings.EqualFold(base, "DB0SDA")
 }
 
 func pathBlocksGating(path []string) bool {
