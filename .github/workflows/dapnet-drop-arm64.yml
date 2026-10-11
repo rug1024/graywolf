@@ -6,6 +6,7 @@ on:
       - feature/drop-dapnet-pocsag-everywhere
       - feature/block-db0sda-rf-to-is
       - feature/igate-mod-crlf
+      - fix/mod-kiss-dashboard
   workflow_dispatch:
 
 permissions:
@@ -37,6 +38,7 @@ jobs:
         run: |
           cd web
           npm ci --no-audit --no-fund --include=optional
+          npm test
           npm run build
 
       - name: Cross-compile Raspberry Pi ARM64 binary
