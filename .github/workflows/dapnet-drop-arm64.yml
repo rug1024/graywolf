@@ -1,0 +1,57 @@
+name: Graywolf DA6PG DAPNET Block ARM64
+
+on:
+  push:
+    branches:
+      - feature/drop-dapnet-pocsag-everywhere
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  arm64-go:
+    name: Test and build Graywolf (linux/arm64)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Run focused Go regression tests
+        run: go test ./pkg/aprs ./pkg/app ./pkg/igate ./pkg/txgovernor
+
+      - name: Build embedded web interface
+        run: |
+          cd web
+          npm ci --no-audit --no-fund --include=optional
+          npm run build
+
+      - name: Cross-compile Raspberry Pi ARM64 binary
+        env:
+          GOOS: linux
+          GOARCH: arm64
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p dist-pi
+          go build -trimpath -ldflags="-s -w -X main.Version=0.14.14-igatefix-dapnet -X main.GitCommit=${GITHUB_SHA::8}" -o dist-pi/graywolf ./cmd/graywolf/
+          file dist-pi/graywolf
+          sha256sum dist-pi/graywolf > dist-pi/sha256.txt
+
+      - name: Upload ARM64 binary
+        uses: actions/upload-artifact@v5
+        with:
+          name: graywolf-dapnet-drop-linux-arm64
+          path: dist-pi/
+          if-no-files-found: error
+          retention-days: 14
