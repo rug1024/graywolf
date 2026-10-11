@@ -90,6 +90,11 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
+      - name: Test retained frontend and iGate fixes
+        run: |
+          npm test --prefix web
+          go test ./pkg/aprs ./pkg/app ./pkg/igate ./pkg/txgovernor ./pkg/webapi
+
       - name: Set up Rust + Android targets
         uses: dtolnay/rust-toolchain@stable
         with:

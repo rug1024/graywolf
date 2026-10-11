@@ -1013,17 +1013,18 @@
     radarLayer?.setOpacity(v);
   });
   // Plain (non-reactive) guard so writing it doesn't retrigger the effect; the
-  // effect re-runs only when mapState.radarRegion changes.
+  // effect tracks radar region and visibility changes.
   let radarRegionApplied = mapState.radarRegion;
   $effect(() => {
     const region = mapState.radarRegion;
+    const visible = radarSettings.visible;
     if (region === RADAR_REGION_OFF) {
       radarLayer?.setVisible(false);
       radarFrames.pause();
       radarFrames.stopPolling();
     } else {
       radarLayer?.setRegion(region);
-      radarLayer?.setVisible(radarSettings.visible);
+      radarLayer?.setVisible(visible);
     }
     if (region !== radarRegionApplied) {
       radarRegionApplied = region;
@@ -1031,7 +1032,7 @@
       // loop and immediately re-poll the new region's manifest so the slider and
       // overlay don't briefly animate the wrong region's frames.
       radarFrames.reset();
-      if (radarSettings.visible && region !== RADAR_REGION_OFF) radarFrames.startPolling();
+      if (visible && region !== RADAR_REGION_OFF) radarFrames.startPolling();
     }
   });
   $effect(() => {

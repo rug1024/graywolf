@@ -174,7 +174,7 @@ func TestIgateLoginAndRFToIS(t *testing.T) {
 	if len(sent) == 0 {
 		t.Fatal("server did not receive any RF->IS line")
 	}
-	if !strings.Contains(sent[0], "W5ABC-7>APRS,WIDE1-1,qAR,KE7XYZ") {
+	if !strings.Contains(sent[0], "W5ABC-7>APRS,WIDE1-1,qAO,KE7XYZ") {
 		t.Fatalf("unexpected line: %q", sent[0])
 	}
 }

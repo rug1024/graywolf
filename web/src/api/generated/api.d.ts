@@ -2861,6 +2861,7 @@ export interface components {
             is_tx_via?: string;
             port?: number;
             rf_channel?: number;
+            rf_to_is_blocklist?: string;
             server?: string;
             server_filter?: string;
             simulation_mode?: boolean;
@@ -2876,6 +2877,7 @@ export interface components {
             is_tx_via?: string;
             port?: number;
             rf_channel?: number;
+            rf_to_is_blocklist?: string;
             server?: string;
             server_filter?: string;
             simulation_mode?: boolean;

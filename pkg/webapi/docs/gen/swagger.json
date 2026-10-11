@@ -10291,6 +10291,9 @@
                 "rf_channel": {
                     "type": "integer"
                 },
+                "rf_to_is_blocklist": {
+                    "type": "string"
+                },
                 "server": {
                     "type": "string"
                 },
@@ -10334,6 +10337,9 @@
                 },
                 "rf_channel": {
                     "type": "integer"
+                },
+                "rf_to_is_blocklist": {
+                    "type": "string"
                 },
                 "server": {
                     "type": "string"
