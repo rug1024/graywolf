@@ -124,6 +124,14 @@ func (a *App) dispatchRxFrame(ctx context.Context, item rxFanoutItem, aprsSubmit
 		return
 	}
 
+	// Apply the operator's DAPNET/POCSAG deny policy before any KISS/AGW
+	// broadcast, digipeater, iGate, station-cache or packet-log consumer.
+	// Decode errors still follow the existing raw-monitor behaviour.
+	f, err := ax25.Decode(rf.Data)
+	if err == nil && aprs.IsDAPNETFrame(f) {
+		return
+	}
+
 	a.kissMgr.BroadcastFromChannel(rf.Channel, rf.Data, skipID, skip)
 
 	// Per-packet audio level comes from the soundcard demodulator only.
@@ -141,7 +149,6 @@ func (a *App) dispatchRxFrame(ctx context.Context, item rxFanoutItem, aprsSubmit
 		srv.BroadcastRawKISS(rf.Channel, rf.Data)
 	}
 
-	f, err := ax25.Decode(rf.Data)
 	if err != nil {
 		a.plog.Record(packetlog.Entry{
 			Channel:    rf.Channel,
