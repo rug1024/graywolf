@@ -32,7 +32,7 @@ jobs:
           cache-dependency-path: web/package-lock.json
 
       - name: Run focused Go regression tests
-        run: go test ./pkg/aprs ./pkg/app ./pkg/igate ./pkg/txgovernor
+        run: go test ./pkg/aprs ./pkg/app ./pkg/igate ./pkg/txgovernor ./pkg/webapi
 
       - name: Build embedded web interface
         run: |

@@ -3567,6 +3567,8 @@ export interface components {
             warning?: string;
         };
         "igate.Status": {
+            tx_channel?: number;
+            is_to_rf_enabled?: boolean;
             callsign?: string;
             connected?: boolean;
             is_to_rf_gated?: number;
@@ -3809,6 +3811,8 @@ export interface components {
             via?: string;
         };
         "webapi.StatusChannel": {
+            enabled?: boolean;
+            mode?: string;
             audio_peak?: number;
             bit_rate?: number;
             dcd_state?: boolean;
@@ -3832,6 +3836,8 @@ export interface components {
             uptime_seconds?: number;
         };
         "webapi.StatusIgateDTO": {
+            tx_channel?: number;
+            is_to_rf_enabled?: boolean;
             /** @description Callsign is the login callsign-SSID presented to APRS-IS. */
             callsign?: string;
             /** @description Connected is true while an APRS-IS session is established. */
