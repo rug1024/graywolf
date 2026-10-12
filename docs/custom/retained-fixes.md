@@ -23,3 +23,10 @@ Linux build label remains Graywolf/0.14.14-mod. Do not automatically rename Andr
 ## Build gate
 
 Compare against the previous integration, run frontend tests and production web build, the affected Go regression packages, and Android BLE/GPS unit tests. Check restored signing-key provenance and a successful APK build. Hardware verification remains a separate user test.
+
+## Upstream synchronization 2026-10-12
+
+Merged upstream main 0acbb7f9faf19a57b34b7858fb3230b5489fbd1f (VERSION remains 0.14.14).
+Retain the runtime per-channel iGate direction/status display and Signal/Signal Night colors.
+Android migration 30 remains the deployed BLE type rename; upstream serial/USB TNC repair runs as migration 31 so existing fork databases receive it.
+Serial/USB defaults follow upstream; BLE retains its existing governor-TX choice. OSM, metric units, custom map server, radar defaults and disabled update checks remain intact.
