@@ -2552,13 +2552,11 @@ definitions:
     type: object
   igate.Status:
     properties:
-      tx_channel:
-        type: integer
-      is_to_rf_enabled:
-        type: boolean
       callsign:
         type: string
       connected:
+        type: boolean
+      is_to_rf_enabled:
         type: boolean
       is_to_rf_gated:
         type: integer
@@ -2574,6 +2572,8 @@ definitions:
         type: string
       simulation_mode:
         type: boolean
+      tx_channel:
+        type: integer
     type: object
   modembridge.AvailableDevice:
     properties:
@@ -2982,10 +2982,6 @@ definitions:
     type: object
   webapi.StatusChannel:
     properties:
-      enabled:
-        type: boolean
-      mode:
-        type: string
       audio_peak:
         type: number
       bit_rate:
@@ -2998,10 +2994,14 @@ definitions:
         type: number
       device_rms_dbfs:
         type: number
+      enabled:
+        type: boolean
       id:
         type: integer
       input_device_id:
         type: integer
+      mode:
+        type: string
       modem_type:
         type: string
       name:
@@ -3030,15 +3030,13 @@ definitions:
     type: object
   webapi.StatusIgateDTO:
     properties:
-      tx_channel:
-        type: integer
-      is_to_rf_enabled:
-        type: boolean
       callsign:
         description: Callsign is the login callsign-SSID presented to APRS-IS.
         type: string
       connected:
         description: Connected is true while an APRS-IS session is established.
+        type: boolean
+      is_to_rf_enabled:
         type: boolean
       is_to_rf_gated:
         description: Downlinked is the cumulative count of IS packets transmitted on RF.
@@ -3061,6 +3059,8 @@ definitions:
       simulation_mode:
         description: SimulationMode is true when RF->IS uploads are suppressed for testing.
         type: boolean
+      tx_channel:
+        type: integer
     type: object
   webapi.SystemLogEntry:
     properties:
