@@ -30,3 +30,5 @@ Merged upstream main 0acbb7f9faf19a57b34b7858fb3230b5489fbd1f (VERSION remains 0
 Retain the runtime per-channel iGate direction/status display and Signal/Signal Night colors.
 Android migration 30 remains the deployed BLE type rename; upstream serial/USB TNC repair runs as migration 31 so existing fork databases receive it.
 Serial/USB defaults follow upstream; BLE retains its existing governor-TX choice. OSM, metric units, custom map server, radar defaults and disabled update checks remain intact.
+
+Signal and Signal Night use bundled Inter for UI text, readable channel status sizes and tabular counters; preserve monospace callsigns/raw packets and offline font availability.

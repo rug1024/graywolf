@@ -345,7 +345,7 @@
                 onclick={() => sendBeaconNow(bcn.id)}
                 disabled={sendingBeacon[bcn.id]}
               >
-                {sendingBeacon[bcn.id] ? 'Sent!' : `Beacon Now: ${beaconLabel(bcn, stationCallsign)}`}
+                {#if sendingBeacon[bcn.id]}Sent!{:else}Beacon Now: <span class="beacon-callsign">{beaconLabel(bcn, stationCallsign)}</span>{/if}
               </Button>
             {/each}
           </div>
