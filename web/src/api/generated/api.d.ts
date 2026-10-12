@@ -3584,10 +3584,9 @@ export interface components {
             warning?: string;
         };
         "igate.Status": {
-            tx_channel?: number;
-            is_to_rf_enabled?: boolean;
             callsign?: string;
             connected?: boolean;
+            is_to_rf_enabled?: boolean;
             is_to_rf_gated?: number;
             last_connected?: string;
             packets_filtered?: number;
@@ -3595,6 +3594,7 @@ export interface components {
             rf_to_is_gated?: number;
             server?: string;
             simulation_mode?: boolean;
+            tx_channel?: number;
         };
         "modembridge.AvailableDevice": {
             channels?: number[];
@@ -3828,16 +3828,16 @@ export interface components {
             via?: string;
         };
         "webapi.StatusChannel": {
-            enabled?: boolean;
-            mode?: string;
             audio_peak?: number;
             bit_rate?: number;
             dcd_state?: boolean;
             device_clipping?: boolean;
             device_peak_dbfs?: number;
             device_rms_dbfs?: number;
+            enabled?: boolean;
             id?: number;
             input_device_id?: number;
+            mode?: string;
             modem_type?: string;
             name?: string;
             rx_bad_fcs?: number;
@@ -3853,12 +3853,11 @@ export interface components {
             uptime_seconds?: number;
         };
         "webapi.StatusIgateDTO": {
-            tx_channel?: number;
-            is_to_rf_enabled?: boolean;
             /** @description Callsign is the login callsign-SSID presented to APRS-IS. */
             callsign?: string;
             /** @description Connected is true while an APRS-IS session is established. */
             connected?: boolean;
+            is_to_rf_enabled?: boolean;
             /** @description Downlinked is the cumulative count of IS packets transmitted on RF. */
             is_to_rf_gated?: number;
             /** @description LastConnected is the UTC RFC3339 timestamp of the most recent successful IS login; omitted if never connected. */
@@ -3873,6 +3872,7 @@ export interface components {
             server?: string;
             /** @description SimulationMode is true when RF->IS uploads are suppressed for testing. */
             simulation_mode?: boolean;
+            tx_channel?: number;
         };
         "webapi.SystemLogEntry": {
             /** @description Attrs are the structured key/value attributes attached to the record; omitted when none. */
