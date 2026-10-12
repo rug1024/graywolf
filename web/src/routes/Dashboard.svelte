@@ -8,6 +8,7 @@
   import PageHeader from '../components/PageHeader.svelte';
   import PacketLogViewer from '../components/PacketLogViewer.svelte';
   import { logPrefsState } from '../lib/settings/log-prefs-store.svelte.js';
+  import { channelGateStatus } from '../lib/igateDashboard.js';
   import { kissLinkStatus, kissTransportLabel } from '../lib/kissDashboard.js';
 
   let packets = $state([]);
@@ -22,6 +23,9 @@
   let now = $state(Date.now());
   let loadSequence = 0;
   let kissFresh = $derived(kissStatusAvailable && now - kissUpdatedAt < 15000);
+  let statusUpdatedAt = $state(0);
+  let statusAvailable = $state(false);
+  let statusFresh = $derived(statusAvailable && !offline && now - statusUpdatedAt < 15000);
   let pollTimer = $state(null);
 
   let offline = $derived(!$online);
@@ -38,6 +42,7 @@
       position = null;
       packets = [];
       kissStatusAvailable = false;
+      statusAvailable = false;
     }
   });
 
@@ -112,6 +117,8 @@
     ]);
     // Never keep an old green link after a failed refresh or server loss.
     if (!$online || sequence !== loadSequence) return;
+    statusAvailable = st.status === 'fulfilled' && !!st.value;
+    if (statusAvailable) statusUpdatedAt = Date.now();
     kissStatusAvailable = kiss.status === 'fulfilled' && Array.isArray(kiss.value);
     if (kissStatusAvailable) {
       kissInterfaces = kiss.value;
@@ -270,6 +277,7 @@
       {@const channelBeacons = beaconsByChannel[ch.id] || []}
       {@const hasAudio = !!ch.input_device_id}
       {@const channelKiss = kissInterfaces.filter(iface => iface.mode === 'tnc' && iface.channel === ch.id)}
+      {@const gates = channelGateStatus(ch, status?.igate, statusFresh)}
       {@const audioPeak = ch.device_peak_dbfs ?? ch.audio_peak}
       <div class="ch-card">
         <div class="ch-header">
@@ -315,9 +323,18 @@
         {/if}
 
         <div class="ch-stats">
-          <span>RX: <strong>{ch.rx_frames || 0}</strong></span>
-          <span>TX: <strong>{ch.tx_frames || 0}</strong></span>
-          {#if hasAudio}<span title="Frames received but rejected by FCS/CRC check. High values indicate marginal signal or interference.">Bad FCS: <strong>{ch.rx_bad_fcs || 0}</strong></span>{/if}
+          <span>RX: <strong class="stat-rx">{ch.rx_frames || 0}</strong></span>
+          <span>TX: <strong class="stat-tx">{ch.tx_frames || 0}</strong></span>
+          {#if hasAudio}<span title="Frames received but rejected by FCS/CRC check. High values indicate marginal signal or interference.">Bad FCS: <strong class:stat-errors={ch.rx_bad_fcs > 0}>{ch.rx_bad_fcs || 0}</strong></span>{/if}
+        </div>
+
+        <div class="channel-gates" aria-label="Channel iGate status" aria-live="polite">
+          {#each gates as gate}
+            <div class="channel-gate" title={gate.detail}>
+              <span>{gate.direction}</span>
+              <span class="gate-state {gate.tone}"><span class="kiss-dot"></span>{gate.label}</span>
+            </div>
+          {/each}
         </div>
 
         {#if channelBeacons.length > 0}
@@ -395,6 +412,18 @@
 </div>
 
 <style>
+  .ch-card .ch-title { color: var(--channel-title, var(--color-text)); }
+  .ch-card .ch-modem, .ch-card .kiss-transport { color: var(--channel-transport, var(--color-text-dim)); }
+  .ch-card .ch-stats .stat-rx { color: var(--channel-rx, var(--color-text)); }
+  .ch-card .ch-stats .stat-tx { color: var(--channel-tx, var(--color-text)); }
+  .ch-card .ch-stats .stat-errors { color: var(--channel-warning, var(--color-warning)); }
+  .channel-gates { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--color-border); padding-top: 10px; font-size: var(--text-xs); }
+  .channel-gate { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 14px; }
+  .gate-state { display: inline-flex; align-items: center; gap: 7px; color: var(--color-text-muted); }
+  .gate-state.active, .ch-card .kiss-state.connected { color: var(--channel-success, var(--color-success)); }
+  .gate-state.pending { color: var(--channel-warning, var(--color-warning)); }
+  .gate-state.simulation { color: var(--channel-transport, var(--color-info)); }
+
   /* ── lost-connection banner ───────────────────── */
   .conn-lost {
     display: flex;

@@ -77,3 +77,12 @@
 :root[data-theme="signal-night"] .pkt-b-origin[data-origin='igate'],
 :root[data-theme="signal-night"] .pkt-b-origin[data-origin='igate-is2rf'],
 :root[data-theme="signal-night"] .pkt-b-origin[data-origin='igate-rf2is'] { background: rgba(167, 139, 250, 0.18); color: #c4b5fd; }
+
+:root:root[data-theme="signal-night"] {
+  --channel-title: #53d4dd;
+  --channel-rx: #53d4dd;
+  --channel-transport: #be9aff;
+  --channel-success: #6cda98;
+  --channel-tx: #f0b65b;
+  --channel-warning: #f0b65b;
+}

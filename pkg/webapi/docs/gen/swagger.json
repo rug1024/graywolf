@@ -11659,6 +11659,12 @@
         "igate.Status": {
             "type": "object",
             "properties": {
+                "tx_channel": {
+                    "type": "integer"
+                },
+                "is_to_rf_enabled": {
+                    "type": "boolean"
+                },
                 "callsign": {
                     "type": "string"
                 },
@@ -12264,6 +12270,12 @@
         "webapi.StatusChannel": {
             "type": "object",
             "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "mode": {
+                    "type": "string"
+                },
                 "audio_peak": {
                     "type": "number"
                 },
@@ -12332,6 +12344,12 @@
         "webapi.StatusIgateDTO": {
             "type": "object",
             "properties": {
+                "tx_channel": {
+                    "type": "integer"
+                },
+                "is_to_rf_enabled": {
+                    "type": "boolean"
+                },
                 "callsign": {
                     "description": "Callsign is the login callsign-SSID presented to APRS-IS.",
                     "type": "string"

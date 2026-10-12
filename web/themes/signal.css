@@ -81,3 +81,12 @@
 :root[data-theme="signal"] .pkt-b-origin[data-origin='igate'],
 :root[data-theme="signal"] .pkt-b-origin[data-origin='igate-is2rf'],
 :root[data-theme="signal"] .pkt-b-origin[data-origin='igate-rf2is'] { background: #7c3aed; color: #ffffff; }
+
+:root:root[data-theme="signal"] {
+  --channel-title: #007b87;
+  --channel-rx: #007b87;
+  --channel-transport: #7244b6;
+  --channel-success: #167a42;
+  --channel-tx: #9b5a08;
+  --channel-warning: #9b5a08;
+}

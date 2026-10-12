@@ -2552,6 +2552,10 @@ definitions:
     type: object
   igate.Status:
     properties:
+      tx_channel:
+        type: integer
+      is_to_rf_enabled:
+        type: boolean
       callsign:
         type: string
       connected:
@@ -2978,6 +2982,10 @@ definitions:
     type: object
   webapi.StatusChannel:
     properties:
+      enabled:
+        type: boolean
+      mode:
+        type: string
       audio_peak:
         type: number
       bit_rate:
@@ -3022,6 +3030,10 @@ definitions:
     type: object
   webapi.StatusIgateDTO:
     properties:
+      tx_channel:
+        type: integer
+      is_to_rf_enabled:
+        type: boolean
       callsign:
         description: Callsign is the login callsign-SSID presented to APRS-IS.
         type: string

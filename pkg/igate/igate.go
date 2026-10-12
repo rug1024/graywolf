@@ -173,6 +173,8 @@ type Config struct {
 
 // Status is the current state exposed via the REST endpoint.
 type Status struct {
+	TxChannel uint32 `json:"tx_channel"`
+	IsToRFEnabled bool `json:"is_to_rf_enabled"`
 	Connected      bool      `json:"connected"`
 	Server         string    `json:"server"`
 	Callsign       string    `json:"callsign"`
@@ -971,6 +973,8 @@ func (ig *Igate) Status() Status {
 	ig.mu.Lock()
 	defer ig.mu.Unlock()
 	return Status{
+		TxChannel: ig.txChannel.Load(),
+		IsToRFEnabled: ig.cfg.Governor != nil,
 		Connected:      ig.connected,
 		Server:         ig.cfg.Server,
 		Callsign:       ig.stationCallsign,
