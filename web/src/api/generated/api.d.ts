@@ -914,6 +914,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/kiss/ble-device-scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Scan for BLE KISS TNC devices */
+        get: operations["scanBLEMobilinkd"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/kiss/bonded-bt-devices": {
         parameters: {
             query?: never;
@@ -2844,6 +2861,7 @@ export interface components {
             is_tx_via?: string;
             port?: number;
             rf_channel?: number;
+            rf_to_is_blocklist?: string;
             server?: string;
             server_filter?: string;
             simulation_mode?: boolean;
@@ -2859,6 +2877,7 @@ export interface components {
             is_tx_via?: string;
             port?: number;
             rf_channel?: number;
+            rf_to_is_blocklist?: string;
             server?: string;
             server_filter?: string;
             simulation_mode?: boolean;
@@ -3567,13 +3586,16 @@ export interface components {
         "igate.Status": {
             callsign?: string;
             connected?: boolean;
+            is_to_rf_enabled?: boolean;
             is_to_rf_gated?: number;
             last_connected?: string;
             packets_filtered?: number;
             rf_to_is_dropped?: number;
+            rf_to_is_enabled?: boolean;
             rf_to_is_gated?: number;
             server?: string;
             simulation_mode?: boolean;
+            tx_channel?: number;
         };
         "modembridge.AvailableDevice": {
             channels?: number[];
@@ -3813,8 +3835,10 @@ export interface components {
             device_clipping?: boolean;
             device_peak_dbfs?: number;
             device_rms_dbfs?: number;
+            enabled?: boolean;
             id?: number;
             input_device_id?: number;
+            mode?: string;
             modem_type?: string;
             name?: string;
             rx_bad_fcs?: number;
@@ -3834,6 +3858,7 @@ export interface components {
             callsign?: string;
             /** @description Connected is true while an APRS-IS session is established. */
             connected?: boolean;
+            is_to_rf_enabled?: boolean;
             /** @description Downlinked is the cumulative count of IS packets transmitted on RF. */
             is_to_rf_gated?: number;
             /** @description LastConnected is the UTC RFC3339 timestamp of the most recent successful IS login; omitted if never connected. */
@@ -3842,12 +3867,15 @@ export interface components {
             packets_filtered?: number;
             /** @description DroppedOffline is the cumulative count of RF packets dropped because the IS session was offline. */
             rf_to_is_dropped?: number;
+            /** @description RFToISEnabled is the live RF→APRS-IS master switch, independent of connection and simulation. */
+            rf_to_is_enabled?: boolean;
             /** @description Gated is the cumulative count of RF packets forwarded to APRS-IS. */
             rf_to_is_gated?: number;
             /** @description Server is the APRS-IS host:port currently in use (or last attempted). */
             server?: string;
             /** @description SimulationMode is true when RF->IS uploads are suppressed for testing. */
             simulation_mode?: boolean;
+            tx_channel?: number;
         };
         "webapi.SystemLogEntry": {
             /** @description Attrs are the structured key/value attributes attached to the record; omitted when none. */
@@ -7465,6 +7493,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["webtypes.ErrorResponse"];
+                };
+            };
+        };
+    };
+    scanBLEMobilinkd: {
+        parameters: {
+            query?: {
+                /** @description Scan duration in seconds (default 15, max 60) */
+                timeout?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description SSE stream of BLEDevice objects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description scan already in progress */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["webtypes.ErrorResponse"];
+                };
+            };
+            /** @description not available on this platform */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": components["schemas"]["webtypes.ErrorResponse"];
                 };
             };
         };

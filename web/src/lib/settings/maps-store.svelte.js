@@ -15,7 +15,7 @@ export const ISSUES_URL = 'https://github.com/chrissnell/graywolf/issues';
 
 function emptyConfig() {
   return {
-    source: 'graywolf',
+    source: 'osm',
     callsign: '',
     registered: false,
     registeredAt: null,
@@ -35,7 +35,7 @@ export const mapsState = (() => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       cfg = {
-        source: data.source ?? 'graywolf',
+        source: data.source ?? 'osm',
         callsign: data.callsign ?? '',
         registered: !!data.registered,
         registeredAt: data.registered_at ? new Date(data.registered_at) : null,

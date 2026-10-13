@@ -822,6 +822,20 @@
     }
   }
 
+  /* Very narrow phones (including Galaxy S24-class logical viewports)
+     cannot fit the wordmark plus four primary actions and the hamburger at
+     44px touch targets. Drop only the wordmark; keep all controls at their
+     normal hit-box size so nothing is pushed beyond the right edge. */
+  @media (max-width: 430px) {
+    .top-bar-wordmark {
+      display: none;
+    }
+    .top-bar-brand {
+      gap: 0;
+      padding: 0 4px;
+    }
+  }
+
   /* Landscape phone: vertical icon rail down the left edge. Wins back the
      full viewport height for the map, which a horizontal bar would eat
      into (GH #419) -- this matters most on the *smallest* landscape phones

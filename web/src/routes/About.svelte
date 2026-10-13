@@ -6,11 +6,15 @@
   import { updates } from '../lib/updatesStore.svelte.js';
 
   let version = $state('');
+  let commit = $state('');
+  let platform = $state('');
 
   onMount(async () => {
     try {
       const d = await fetch('/api/version').then(r => r.json());
       version = d.version || '';
+      commit = d.commit || '';
+      platform = d.platform || '';
     } catch {}
     // Pull the full changelog for the What's new list below.
     // Re-runs every visit — cheap and keeps the list fresh if another
@@ -27,6 +31,12 @@
   <section class="about-section" aria-labelledby="install-heading">
     <h2 id="install-heading" class="about-section-heading">This install</h2>
     <p class="about-version">Graywolf v.{version}</p>
+    {#if commit && commit !== 'unknown'}
+      <p class="about-build">
+        {platform === 'android' ? 'Android dev build' : 'Build'}:
+        <code>{commit.slice(0, 10)}</code>
+      </p>
+    {/if}
     <p class="about-copyright">&copy; 2026 Chris Snell, NW5W</p>
   </section>
 
@@ -174,6 +184,19 @@
     font-size: 14px;
     font-weight: 700;
     margin: 0 0 8px;
+  }
+
+  .about-build {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: -2px 0 8px;
+  }
+
+  .about-build code {
+    font-size: 12px;
+    padding: 1px 5px;
+    background: var(--bg-secondary);
+    border-radius: 3px;
   }
 
   .about-copyright {

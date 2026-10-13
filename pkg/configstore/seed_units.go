@@ -13,7 +13,7 @@ import (
 
 // unitsSystemImperial and unitsSystemMetric are the only two valid
 // System values. Anything else read from the row (e.g. a hand-edited
-// DB or a forward-incompatible value) falls back to imperial on read.
+// DB or a forward-incompatible value) falls back to metric on read.
 const (
 	unitsSystemImperial = "imperial"
 	unitsSystemMetric   = "metric"
@@ -21,21 +21,21 @@ const (
 
 // GetUnitsConfig returns the singleton measurement-system preference.
 // When no row exists (fresh install), returns UnitsConfig{System:
-// "imperial"} with no error so the UI has a deterministic default
+// "metric"} with no error so the UI has a deterministic default
 // without a seed step. An unknown System value in the stored row is
-// normalized to imperial so the frontend always sees one of the two
+// normalized to metric so the frontend always sees one of the two
 // valid values.
 func (s *Store) GetUnitsConfig(ctx context.Context) (UnitsConfig, error) {
 	var c UnitsConfig
 	err := s.db.WithContext(ctx).Order("id").First(&c).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return UnitsConfig{System: unitsSystemImperial}, nil
+		return UnitsConfig{System: unitsSystemMetric}, nil
 	}
 	if err != nil {
 		return UnitsConfig{}, err
 	}
 	if c.System != unitsSystemImperial && c.System != unitsSystemMetric {
-		c.System = unitsSystemImperial
+		c.System = unitsSystemMetric
 	}
 	return c, nil
 }
