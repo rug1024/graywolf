@@ -149,3 +149,23 @@ func TestStatusIgateLiveRoutingProjection(t *testing.T) {
 		t.Fatalf("live routing fields lost: %+v", got)
 	}
 }
+
+func TestStatusIgateDTOProjectsRFToISMasterSwitch(t *testing.T) {
+	for _, enabled := range []bool{true, false} {
+		dto := newStatusIgateDTO(igate.Status{RFToISEnabled: enabled, Connected: true, IsToRFEnabled: true})
+		b, err := json.Marshal(dto)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var wire map[string]any
+		if err := json.Unmarshal(b, &wire); err != nil {
+			t.Fatal(err)
+		}
+		if got, ok := wire["rf_to_is_enabled"]; !ok || got != enabled {
+			t.Fatalf("master switch absent or wrong: %s", b)
+		}
+		if !dto.Connected || !dto.IsToRFEnabled {
+			t.Fatal("uplink flag changed other status fields")
+		}
+	}
+}

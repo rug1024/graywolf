@@ -6,7 +6,11 @@ export function channelGateStatus(channel, igate, fresh = true) {
     if (!fresh || typeof channel.enabled !== 'boolean') return result('Status unavailable', 'unknown');
     if (!channel.enabled || !igate) return result('Disabled', 'disabled');
     // RF receive fan-out submits APRS UI frames from every enabled channel.
-    // The legacy rf_channel/gate_rf_to_is config fields do not select this route.
+    // The runtime master switch controls all RF→IS uploads independently of downlink.
+    if (index === 0) {
+      if (typeof igate.rf_to_is_enabled !== 'boolean') return result('Status unavailable', 'unknown');
+      if (!igate.rf_to_is_enabled) return result('Disabled', 'disabled');
+    }
     if (index === 1) {
       if (typeof igate.is_to_rf_enabled !== 'boolean') return result('Status unavailable', 'unknown');
       if (!igate.is_to_rf_enabled || !igate.tx_channel || igate.tx_channel !== channel.id || channel.mode === 'packet') return result('Disabled', 'disabled');

@@ -173,8 +173,9 @@ type Config struct {
 
 // Status is the current state exposed via the REST endpoint.
 type Status struct {
-	TxChannel uint32 `json:"tx_channel"`
-	IsToRFEnabled bool `json:"is_to_rf_enabled"`
+	RFToISEnabled  bool      `json:"rf_to_is_enabled"`
+	TxChannel      uint32    `json:"tx_channel"`
+	IsToRFEnabled  bool      `json:"is_to_rf_enabled"`
 	Connected      bool      `json:"connected"`
 	Server         string    `json:"server"`
 	Callsign       string    `json:"callsign"`
@@ -202,7 +203,7 @@ type Igate struct {
 	filter atomic.Pointer[filters.Engine]
 	// Read without locks on RF receive; updated on live iGate reconfiguration.
 	rfToISBlocklist atomic.Pointer[rfToISBlocklist]
-	heard  *heardDirect
+	heard           *heardDirect
 
 	mu            sync.Mutex
 	connected     bool
@@ -989,8 +990,9 @@ func (ig *Igate) Status() Status {
 	ig.mu.Lock()
 	defer ig.mu.Unlock()
 	return Status{
-		TxChannel: ig.txChannel.Load(),
-		IsToRFEnabled: ig.cfg.Governor != nil,
+		RFToISEnabled:  ig.rfToIsEnabled.Load(),
+		TxChannel:      ig.txChannel.Load(),
+		IsToRFEnabled:  ig.cfg.Governor != nil,
 		Connected:      ig.connected,
 		Server:         ig.cfg.Server,
 		Callsign:       ig.stationCallsign,

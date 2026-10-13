@@ -25,8 +25,10 @@ type StatusDTO struct {
 // Option<Box<_>> wrappers around an external schema. The JSON wire shape
 // is identical to igate.Status.
 type StatusIgateDTO struct {
-	TxChannel uint32 `json:"tx_channel"`
-	IsToRFEnabled bool `json:"is_to_rf_enabled"`
+	// RFToISEnabled is the live RF→APRS-IS master switch, independent of connection and simulation.
+	RFToISEnabled bool   `json:"rf_to_is_enabled"`
+	TxChannel     uint32 `json:"tx_channel"`
+	IsToRFEnabled bool   `json:"is_to_rf_enabled"`
 	// Connected is true while an APRS-IS session is established.
 	Connected bool `json:"connected"`
 	// Server is the APRS-IS host:port currently in use (or last attempted).
@@ -49,8 +51,8 @@ type StatusIgateDTO struct {
 
 // StatusChannel pairs a channel config with its live stats.
 type StatusChannel struct {
-	Enabled bool `json:"enabled"`
-	Mode string `json:"mode"`
+	Enabled        bool    `json:"enabled"`
+	Mode           string  `json:"mode"`
 	ID             uint32  `json:"id"`
 	Name           string  `json:"name"`
 	ModemType      string  `json:"modem_type"`
@@ -128,8 +130,8 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, ch := range channels {
 		sc := StatusChannel{
-			Enabled: ch.Enabled,
-			Mode: ch.Mode,
+			Enabled:   ch.Enabled,
+			Mode:      ch.Mode,
 			ID:        ch.ID,
 			Name:      ch.Name,
 			ModemType: ch.ModemType,
@@ -192,8 +194,9 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 // Field mapping is 1:1 to preserve JSON compatibility with prior releases.
 func newStatusIgateDTO(s igate.Status) *StatusIgateDTO {
 	return &StatusIgateDTO{
-		TxChannel: s.TxChannel,
-		IsToRFEnabled: s.IsToRFEnabled,
+		RFToISEnabled:  s.RFToISEnabled,
+		TxChannel:      s.TxChannel,
+		IsToRFEnabled:  s.IsToRFEnabled,
 		Connected:      s.Connected,
 		Server:         s.Server,
 		Callsign:       s.Callsign,
