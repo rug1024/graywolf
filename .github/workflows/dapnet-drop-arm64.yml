@@ -6,6 +6,7 @@ on:
       - feature/drop-dapnet-pocsag-everywhere
       - feature/block-db0sda-rf-to-is
       - feature/igate-mod-crlf
+      - fix/igate-blocklist-whitespace
   workflow_dispatch:
 
 permissions:
@@ -39,6 +40,11 @@ jobs:
           npm ci --no-audit --no-fund --include=optional
           npm run build
 
+      - name: Run web iGate blocklist regression tests
+        run: |
+          cd web
+          node --test src/lib/igateBlocklist.test.js
+
       - name: Cross-compile Raspberry Pi ARM64 binary
         env:
           GOOS: linux
@@ -53,7 +59,7 @@ jobs:
       - name: Upload ARM64 binary
         uses: actions/upload-artifact@v5
         with:
-          name: graywolf-0.14.14-mod-linux-arm64
+          name: graywolf-0.14.14-mod-blocklist-ui-fix-linux-arm64
           path: dist-pi/
           if-no-files-found: error
           retention-days: 14
