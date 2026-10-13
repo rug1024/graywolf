@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { Button, Input, Toggle, Select, Box, Icon, Badge } from '@chrissnell/chonky-ui';
   import { api } from '../lib/api.js';
+  import { validateRFToISBlocklist } from '../lib/igateBlocklist.js';
   import { toasts } from '../lib/stores.js';
   import PageHeader from '../components/PageHeader.svelte';
   import FormField from '../components/FormField.svelte';
@@ -48,6 +49,7 @@
   let savedConfig = $state(/** @type {null | object} */ (null));
   let enableSaving = $state(false);
   let gateIsToRfSaving = $state(false);
+  let gateRfToIsSaving = $state(false);
 
   // Station callsign (read-only on this page). Loaded alongside the
   // iGate config; failure is non-fatal — we treat a failed load as
@@ -112,17 +114,6 @@
 
   // This is a local RF→IS exclusion list, not an APRS-IS server filter.
   // Bare callsigns match all SSIDs; an explicit suffix matches only that SSID.
-  function validateRFToISBlocklist(value) {
-    const calls = (value ?? '').split(/[\\s,;]+/).filter(Boolean);
-    if (calls.length > 100) return 'Maximum 100 callsigns.';
-    for (const call of calls) {
-      const m = /^([A-Za-z0-9]{1,6})(?:-([0-9]{1,2}))?$/.exec(call);
-      if (!m || (m[2] !== undefined && Number(m[2]) > 15)) {
-        return `Invalid callsign: ${call}`;
-      }
-    }
-    return '';
-  }
   let rfToISBlocklistError = $derived(validateRFToISBlocklist(form.rf_to_is_blocklist));
 
   // Client mirror of ax25.ParseVia (pkg/ax25/address.go). The IS→RF
@@ -545,6 +536,24 @@
   // gate_is_to_rf is the real IS→RF on/off switch: with it off the TX
   // governor is never wired and no packet reaches RF, regardless of the
   // rule table.
+  // Master RF→IS toggle auto-saves only its own persisted setting,
+  // preserving unrelated unsaved edits in the form.
+  async function autoSaveGateRfToIs(next) {
+    if (!savedConfig || next === savedConfig.gate_rf_to_is || gateRfToIsSaving) return;
+    gateRfToIsSaving = true;
+    try {
+      const body = { ...savedConfig, gate_rf_to_is: next };
+      await api.put('/igate/config', body);
+      savedConfig = body;
+      toasts.success(next ? 'RF→IS forwarding enabled' : 'RF→IS forwarding disabled');
+    } catch (err) {
+      form.gate_rf_to_is = savedConfig.gate_rf_to_is;
+      toasts.error(err.message || 'Failed to update RF→IS forwarding');
+    } finally {
+      gateRfToIsSaving = false;
+    }
+  }
+
   async function autoSaveGateIsToRf(next) {
     if (!savedConfig || next === savedConfig.gate_is_to_rf || gateIsToRfSaving) return;
     gateIsToRfSaving = true;
@@ -759,6 +768,18 @@
         onkeydown={handleEnableToggleKeydown}
         onCheckedChange={autoSaveEnabled}
       />
+      <div class="gate-master-toggle">
+        <Toggle
+          bind:checked={form.gate_rf_to_is}
+          label="Enable RF→IS forwarding"
+          onCheckedChange={autoSaveGateRfToIs}
+        />
+        <p class="field-note">
+          Forward eligible RF packets to APRS-IS. Independent of the IS→RF
+          switch. Enable for a receive-only iGate; turn off to suppress all
+          uplinks including KISS-client transmissions.
+        </p>
+      </div>
       <div style="margin-top: 16px;">
         <FormField label="APRS-IS Server" id="ig-server">
           <Select

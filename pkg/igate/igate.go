@@ -208,6 +208,8 @@ type Igate struct {
 	connected     bool
 	lastConnected time.Time
 	simulation    atomic.Bool
+	// Controls both RF receive uploads and KISS-client RF→IS TX gating.
+	rfToIsEnabled atomic.Bool
 
 	// txChannel mirrors cfg.TxChannel but is mutable at runtime via
 	// SetTxChannel so an iGate-config save can retarget IS→RF without
@@ -298,6 +300,8 @@ func New(cfg Config) (*Igate, error) {
 	ig.rfToISBlocklist.Store(newRFToISBlocklist(cfg.RFToISBlocklist))
 	ig.sessCtx.Store(&sessCtxHolder{ctx: context.Background()})
 	ig.simulation.Store(cfg.SimulationMode)
+	// Keep the existing direct-usage default; App wiring loads the saved switch.
+	ig.rfToIsEnabled.Store(true)
 	ig.txChannel.Store(cfg.TxChannel)
 	// Parse the IS→RF via-path once at construction. A malformed value
 	// (validated at save time, so normally unreachable) falls back to
@@ -718,6 +722,7 @@ type GateReason string
 
 const (
 	GateReasonNilPacket   GateReason = "nil-packet"
+	GateReasonDisabled    GateReason = "rf-to-is-disabled"
 	GateReasonDAPNET      GateReason = "dapnet-pocsag-blocked"
 	GateReasonSourceBlock GateReason = "rf-to-is-source-blocked"
 	GateReasonThirdParty  GateReason = "third-party"
@@ -757,6 +762,11 @@ func (ig *Igate) gateRFToIS(pkt *aprs.DecodedAPRSPacket) GateReason {
 	// frame yet (no '*' marker in the path).
 	if pkt.Source != "" && pathIsDirect(pkt.Path) {
 		ig.heard.Record(pkt.Source)
+	}
+	// The live operator switch applies to both KISS TX and RF receive
+	// uplinks; continue listening and receiving even while disabled.
+	if !ig.rfToIsEnabled.Load() {
+		return GateReasonDisabled
 	}
 	// Rule: never gate third-party traffic (already came from the net).
 	if pkt.ThirdParty != nil || pkt.Type == aprs.PacketThirdParty {
@@ -905,6 +915,12 @@ func (ig *Igate) SendLine(line string) error {
 // they are persisted to the database.
 func (ig *Igate) SetRFToISBlocklist(value string) {
 	ig.rfToISBlocklist.Store(newRFToISBlocklist(value))
+}
+
+// SetRFToISEnabled changes RF→IS gating without touching the APRS-IS
+// receive connection or IS→RF messaging configuration.
+func (ig *Igate) SetRFToISEnabled(enabled bool) {
+	ig.rfToIsEnabled.Store(enabled)
 }
 
 func (ig *Igate) Reconfigure(serverFilter string, rules []filters.Rule, gov txgovernor.TxSink) {

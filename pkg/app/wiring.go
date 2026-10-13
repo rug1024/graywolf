@@ -929,6 +929,7 @@ func (a *App) buildIgateInstance(ctx context.Context, igCfg *configstore.IGateCo
 		a.logger.Error("igate init", "err", err)
 		return nil, "", nil
 	}
+	ig.SetRFToISEnabled(igCfg.GateRfToIs)
 	return ig, composedFilter, nil
 }
 
@@ -2979,6 +2980,7 @@ func (a *App) reloadIgate(ctx context.Context) {
 	}
 
 	// enabled → enabled (TX channel + via-path + filter / rules push-through).
+	cur.SetRFToISEnabled(igCfg.GateRfToIs)
 	cur.SetTxChannel(a.resolveTxChannel(ctx, igCfg.TxChannel))
 	cur.SetIsTxVia(igCfg.IsTxVia)
 	cur.SetRFToISBlocklist(igCfg.RFToISBlocklist)
