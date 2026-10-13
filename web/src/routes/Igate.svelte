@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { Button, Input, Toggle, Select, Box, Icon, Badge } from '@chrissnell/chonky-ui';
   import { api } from '../lib/api.js';
+  import { validateRFToISBlocklist } from '../lib/igateBlocklist.js';
   import { toasts } from '../lib/stores.js';
   import PageHeader from '../components/PageHeader.svelte';
   import FormField from '../components/FormField.svelte';
@@ -112,17 +113,6 @@
 
   // This is a local RF→IS exclusion list, not an APRS-IS server filter.
   // Bare callsigns match all SSIDs; an explicit suffix matches only that SSID.
-  function validateRFToISBlocklist(value) {
-    const calls = (value ?? '').split(/[\\s,;]+/).filter(Boolean);
-    if (calls.length > 100) return 'Maximum 100 callsigns.';
-    for (const call of calls) {
-      const m = /^([A-Za-z0-9]{1,6})(?:-([0-9]{1,2}))?$/.exec(call);
-      if (!m || (m[2] !== undefined && Number(m[2]) > 15)) {
-        return `Invalid callsign: ${call}`;
-      }
-    }
-    return '';
-  }
   let rfToISBlocklistError = $derived(validateRFToISBlocklist(form.rf_to_is_blocklist));
 
   // Client mirror of ax25.ParseVia (pkg/ax25/address.go). The IS→RF
