@@ -1,0 +1,58 @@
+name: Sign compatible Graywolf mod update
+
+on:
+  pull_request:
+    branches: [main]
+    paths: ['.github/workflows/android-legacy-update-sign.yml']
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  sign-existing-apk:
+    if: github.repository == 'rug1024/graywolf' && github.event.pull_request.number == 2 && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restore original BLE test debug signing key (never generate a replacement)
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.config/.android/debug.keystore
+          key: graywolf-debug-keystore-v1
+          fail-on-cache-miss: true
+
+      - name: Download tested graywolf-mod d695f92e APK from Android build 115
+        uses: actions/download-artifact@v4
+        with:
+          name: graywolf-debug-apk
+          path: incoming
+          repository: rug1024/graywolf
+          run-id: 38460249069
+          github-token: ${{ github.token }}
+
+      - name: Verify exact tested APK before signing
+        run: |
+          echo '538cbf58542ab0d66bde937f7560d6f1a18b74f383987f7c75cc72aeab1c9222  incoming/app-debug.apk' | sha256sum -c -
+
+      - name: Set up Android signing tools
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'build-tools;36.0.0'
+
+      - name: Sign with original certificate and verify update compatibility
+        run: |
+          set -euo pipefail
+          mkdir -p compatible-update
+          signer="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          "$signer" sign --ks "$HOME/.config/.android/debug.keystore" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out compatible-update/graywolf-mod-d695f92e-update.apk incoming/app-debug.apk
+          "$signer" verify --verbose --print-certs compatible-update/graywolf-mod-d695f92e-update.apk | tee compatible-update/signature-verification.txt
+          grep -F 'Signer #1 certificate SHA-256 digest: 5e8aef2ea71a52a84e723974317c6af39549fb9167d6ff8639cb23d7eae299eb' compatible-update/signature-verification.txt
+          (cd compatible-update && sha256sum graywolf-mod-d695f92e-update.apk > SHA256SUMS.txt)
+
+      - name: Upload compatible APK and public verification evidence (no private key)
+        uses: actions/upload-artifact@v4
+        with:
+          name: graywolf-mod-d695f92e-compatible-update
+          path: compatible-update/
+          if-no-files-found: error
+          retention-days: 14
