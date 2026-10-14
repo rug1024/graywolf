@@ -1,0 +1,64 @@
+name: Validate four upstream iGate contributions
+on:
+  push:
+    branches:
+      - ci/igate-upstream-review-20261014
+permissions:
+  contents: write
+jobs:
+  verify:
+    name: ${{ matrix.topic }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - topic: RF-to-IS master switch
+            branch: upstream/igate-rf-to-is-master
+          - topic: Digipeater H-bit preservation
+            branch: upstream/igate-preserve-hbit
+          - topic: CR-LF line framing
+            branch: upstream/igate-crlf-sanitize
+          - topic: RF-to-IS source exclusions
+            branch: upstream/igate-source-exclusions
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ matrix.branch }}
+          fetch-depth: 0
+      - run: sudo apt-get update && sudo apt-get install -y libasound2-dev jq
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install frontend dependencies and schema generator
+        run: |
+          cd web
+          npm ci
+          cd ..
+          mkdir -p scratch/bin
+          GOBIN="$(pwd)/scratch/bin" go install github.com/swaggo/swag/cmd/swag@v1.16.4
+      - name: Format changed Go files and regenerate API artifacts
+        run: |
+          git diff --name-only 0acbb7f9faf19a57b34b7858fb3230b5489fbd1f HEAD -- '*.go' | xargs -r gofmt -w
+          make docs api-client
+          if ! git diff --quiet; then
+            git config user.name "rug1024"
+            git config user.email "96115731+rug1024@users.noreply.github.com"
+            git add -u
+            git commit -m "style: format Go and regenerate API artifacts"
+            git push origin HEAD:${{ matrix.branch }}
+          fi
+      - name: API checks
+        run: make docs-check docs-lint api-client-check
+      - name: Go vet
+        run: go vet ./pkg/aprs/... ./pkg/igate/... ./pkg/app/... ./pkg/configstore/... ./pkg/webapi/...
+      - name: Go regression tests with race detector
+        run: go test -race -count=1 ./pkg/aprs/... ./pkg/igate/... ./pkg/app/... ./pkg/configstore/... ./pkg/webapi/...
+      - name: Frontend tests and production build
+        working-directory: web
+        run: |
+          npm test
+          npm run build
