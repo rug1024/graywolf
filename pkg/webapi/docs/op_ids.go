@@ -83,6 +83,7 @@ const (
 	OpSetKissEnabled               = "setKissEnabled"
 	OpDeleteKiss                   = "deleteKiss"
 	OpReconnectKiss                = "reconnectKiss"
+	OpScanBLEMobilinkd             = "scanBLEMobilinkd"
 	OpGetBondedBtDevices           = "getBondedBtDevices"
 	OpGetAvailableUsbSerialDevices = "getAvailableUsbSerialDevices"
 	OpListAvailableKissSerialPorts = "listAvailableKissSerialPorts"

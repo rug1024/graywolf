@@ -186,6 +186,11 @@
   }
   .main-content {
     flex: 1;
+    /* A flex item's default min-width:auto lets wide descendants force the
+       entire app viewport wider than the phone. Keep the page itself
+       shrinkable; components that genuinely need extra width (tables, logs)
+       provide their own horizontal scrolling. */
+    min-width: 0;
     margin-left: var(--sidebar-width);
     padding: 24px;
     max-width: 1200px;

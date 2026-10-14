@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/chrissnell/graywolf/pkg/ax25"
+	"github.com/chrissnell/graywolf/pkg/aprs"
 	"github.com/chrissnell/graywolf/pkg/internal/dedup"
 	"github.com/chrissnell/graywolf/pkg/internal/ratelimit"
 	pb "github.com/chrissnell/graywolf/pkg/ipcproto"
@@ -56,6 +57,8 @@ var (
 	// ErrNilFrame is returned when Submit is called with a nil *Frame.
 	// Caller bug; should never happen at runtime.
 	ErrNilFrame = errors.New("txgovernor: nil frame")
+	// ErrDAPNET is a deliberate local policy block, not a transient queue error.
+	ErrDAPNET = errors.New("txgovernor: DAPNET/POCSAG traffic blocked")
 )
 
 // SubmitSource describes the origin of a TX request for logging, dedup
@@ -291,6 +294,11 @@ func New(cfg Config) *Governor {
 func (g *Governor) Submit(ctx context.Context, channel uint32, frame *ax25.Frame, src SubmitSource) error {
 	if frame == nil {
 		return ErrNilFrame
+	}
+	// All radio transmit requests converge here: client TX, digipeater,
+	// beacon and APRS-IS downlink. No DAPNET frame may reach a backend.
+	if aprs.IsDAPNETFrame(frame) {
+		return ErrDAPNET
 	}
 	if ctx != nil {
 		if err := ctx.Err(); err != nil {
