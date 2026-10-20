@@ -40,3 +40,13 @@
 :root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) :is(.pkt-srcdst, .pkt-raw, .beacon-callsign) {
   font-family: var(--font-mono);
 }
+
+/* MapLibre owns station-popup DOM outside Svelte's component scope.
+ * Override its explicit monospace container for the Signal palettes too. */
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) .stn-popup {
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+}
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) .stn-popup :is(.stn-call, .stn-src-call, .stn-coords, .stn-path) {
+  font-family: var(--font-mono);
+}
