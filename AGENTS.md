@@ -11,3 +11,7 @@ When delivering an Android APK from this fork as an update to the user's install
 - Never generate a replacement key when the original cache cannot be restored. Stop delivery and explain the blocker instead.
 - Never recommend uninstalling the existing app to work around a signature mismatch; preserve its settings and message history.
 - Keep private key material out of repository files, logs, and downloadable artifacts.
+
+# Build cadence
+
+Collect proposed changes first. Only start Pi or Android builds when the user explicitly requests a build. Pushing graywolf-mod updates triggers builds automatically, so hold those pushes until a build is authorized. Read-only investigation and preparing changes remain allowed.
