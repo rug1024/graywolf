@@ -353,8 +353,8 @@
     }
   }
 
-  async function handleThreadSend(text, to) {
-    await optimisticSend(text, to);
+  async function handleThreadSend(text, to, channel) {
+    await optimisticSend(text, to, channel);
     refreshNow();
   }
 

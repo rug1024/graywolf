@@ -31,6 +31,8 @@
     DEFAULT_MAX_MESSAGE_TEXT,
   } from '../../lib/settings/messages-preferences-store.svelte.js';
   import { dayHeader, dayKey } from './time.js';
+  import { replyChannel } from './reply-channel.js';
+  import { channelsStore, start as startChannels } from '../../lib/stores/channels.svelte.js';
   import { messages as store } from '../../lib/messagesStore.svelte.js';
   import { countByThread } from '../../lib/unread-batch-core.js';
   import {
@@ -42,7 +44,7 @@
    *    thread: any | null,
    *    onBack?: () => void,
    *    onOpenDm?: (call: string) => void,
-   *    onCompose?: (text: string, to: string) => Promise<any>,
+   *    onCompose?: (text: string, to: string, channel?: number) => Promise<any>,
    *    isMobile?: boolean,
    *  }}
    */
@@ -83,11 +85,28 @@
   /** @type {Array<any>} */
   let msgs = $state([]);
   let loading = $state(false);
+  // Overrides belong to one conversation; switching peers must not leak them.
+  let channelOverrides = $state({});
+  const automaticChannel = $derived(replyChannel(
+    [...msgs, ...store.messageById.values()], thread?.kind, thread?.key,
+  ));
+  const selectedChannel = $derived(channelOverrides[threadId] ?? -1);
+  const transmitChannel = $derived(selectedChannel < 0 ? automaticChannel : selectedChannel);
+  const transmitOptions = $derived.by(() => {
+    const channels = channelsStore.list.filter(c => c.mode !== 'packet');
+    const name = channels.find(c => c.id === automaticChannel)?.name || `Channel ${automaticChannel}`;
+    return [
+      { value: -1, label: automaticChannel ? `Automatic (${name})` : 'Automatic (configured default)' },
+      { value: 0, label: 'Configured default' },
+      ...channels.map(c => ({ value: c.id, label: c.name })),
+    ];
+  });
   let scrollEl = $state(null);
   let scrolledUp = $state(false);
 
   async function fetchThread() {
     if (!thread) { msgs = []; return; }
+    const requestedThreadId = threadId;
     loading = true;
     try {
       const env = await listMessages({
@@ -105,6 +124,7 @@
         const bt = Date.parse(b.sent_at || b.received_at || b.created_at || 0) || 0;
         return at - bt;
       });
+      if (threadId !== requestedThreadId) return;
       msgs = list;
       await tick();
       scrollToBottom(false);
@@ -118,6 +138,7 @@
   // Re-fetch on thread change.
   $effect(() => {
     void threadId;
+    msgs = [];
     fetchThread();
   });
 
@@ -300,6 +321,7 @@
   }
 
   onMount(() => {
+    startChannels();
     rebuildIO();
     const visHandler = () => {
       if (document.visibilityState === 'visible') rebuildIO();
@@ -321,8 +343,8 @@
   });
 
   // --- Send flow (wired to parent).
-  async function handleSend(body, to) {
-    await onCompose?.(body, to);
+  async function handleSend(body, to, channel) {
+    await onCompose?.(body, to, channel);
     // Refresh local msgs from server shortly after 202 lands —
     // the optimistic bubble already appears via store.pendingByClientId.
     refreshNow();
@@ -469,6 +491,11 @@
       tacticalAlias={isTactical ? (thread.alias || '') : ''}
       dmPeer={!isTactical ? thread.key : ''}
       threadHasMessages={allBubbles.length > 0}
+      sendDisabled={loading}
+      channel={transmitChannel}
+      channelChoice={selectedChannel}
+      channelOptions={transmitOptions}
+      onChannelChange={(value) => channelOverrides[threadId] = Number(value)}
       onSend={handleSend}
       autoFocus={true}
     />

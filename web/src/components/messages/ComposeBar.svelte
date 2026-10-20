@@ -26,7 +26,7 @@
   //   - Send icon swaps to radio-tower.
 
   import { onMount } from 'svelte';
-  import { Icon } from '@chrissnell/chonky-ui';
+  import { Icon, Select } from '@chrissnell/chonky-ui';
   import { Platform } from '../../lib/platform.js';
   import CallsignAutocomplete from './CallsignAutocomplete.svelte';
   import {
@@ -85,7 +85,12 @@
    *    tacticalAlias?: string,
    *    dmPeer?: string,
    *    threadHasMessages?: boolean,
-   *    onSend?: (text: string, to?: string) => Promise<any>,
+   *    onSend?: (text: string, to?: string, channel?: number) => Promise<any>,
+   *    channel?: number,
+   *    sendDisabled?: boolean,
+   *    channelChoice?: number,
+   *    channelOptions?: Array<{value: number, label: string}>,
+   *    onChannelChange?: (value: any) => void,
    *    onPickTo?: (call: string) => void,
    *    autoFocus?: boolean,
    *    embedded?: boolean,
@@ -99,6 +104,11 @@
     dmPeer = '',
     threadHasMessages = true,
     onSend,
+    channel = 0,
+    sendDisabled = false,
+    channelChoice = -1,
+    channelOptions = [],
+    onChannelChange,
     onPickTo,
     autoFocus = true,
     embedded = false,
@@ -175,7 +185,7 @@
   }
 
   async function send() {
-    if (over || sending) return;
+    if (over || sending || sendDisabled) return;
     const body = (text || '').trim();
     if (!body) return;
     let target = isTactical ? tacticalKey : (mode === 'thread' ? dmPeer : (toInput || '').trim().toUpperCase());
@@ -183,6 +193,8 @@
       textareaEl?.focus();
       return;
     }
+    // Freeze the route for every part, even if new RF arrives mid-send.
+    const batchChannel = channel;
     sending = true;
     try {
       if (partsList.length > 1) {
@@ -191,10 +203,10 @@
         // is a human-readable hint, NOT APRS-101.
         for (let i = 0; i < partsList.length; i++) {
           const tagged = `{${i + 1}/${partsList.length}} ${partsList[i]}`;
-          await onSend?.(tagged, target);
+          await onSend?.(tagged, target, batchChannel);
         }
       } else {
-        await onSend?.(body, target);
+        await onSend?.(body, target, batchChannel);
       }
       text = '';
       autoGrow();
@@ -344,6 +356,18 @@
     </div>
   {/if}
 
+  {#if channelOptions.length > 0}
+    <div class="channel-row">
+      <span>Transmit channel</span>
+      <Select
+        value={channelChoice}
+        options={channelOptions}
+        onValueChange={onChannelChange}
+        aria-label="Reply transmit channel"
+      />
+    </div>
+  {/if}
+
   <div class="input-row">
     <textarea
       bind:this={textareaEl}
@@ -389,7 +413,7 @@
           type="button"
           class="send"
           onclick={send}
-          disabled={over || sending || (text || '').trim().length === 0}
+          disabled={sendDisabled || over || sending || (text || '').trim().length === 0}
           aria-label="Send message"
           data-testid="compose-send"
         >
@@ -401,6 +425,14 @@
 </div>
 
 <style>
+  .channel-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 11px;
+  }
+
   .compose {
     /* position:absolute inside the thread pane so visualViewport
        translations work on iOS. The parent MessageThread provides
