@@ -21,13 +21,30 @@ jobs:
           key: graywolf-debug-keystore-v1
           fail-on-cache-miss: true
 
-      - name: Download tested graywolf-mod bdc69c12 APK from the verified Android build
+      - name: Wait for the pinned Android build to finish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 90); do
+            gh api repos/rug1024/graywolf/actions/runs/39486112961 > build-status.json
+            jq -e '.head_sha == "f2ee3b9d6ed316bba6ebe1a8ef7c4206aa547d7a"' build-status.json > /dev/null
+            if [ "$(jq -r .status build-status.json)" = completed ]; then
+              jq -e '.conclusion == "success"' build-status.json
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::Timed out waiting for the pinned Android build"
+          exit 1
+
+      - name: Download tested graywolf-mod f2ee3b9d APK from the verified Android build
         uses: actions/download-artifact@v4
         with:
           name: graywolf-debug-apk
           path: incoming
           repository: rug1024/graywolf
-          run-id: 39390797809
+          run-id: 39486112961
           github-token: ${{ github.token }}
 
       - name: Verify source build and record input checksum
@@ -35,8 +52,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api repos/rug1024/graywolf/actions/runs/39390797809 --jq '{sha: .head_sha, conclusion: .conclusion}' > source-build.json
-          jq -e '.sha == "bdc69c1285d45e64e8ba087555fe42056ca10c59" and .conclusion == "success"' source-build.json
+          gh api repos/rug1024/graywolf/actions/runs/39486112961 --jq '{sha: .head_sha, conclusion: .conclusion}' > source-build.json
+          jq -e '.sha == "f2ee3b9d6ed316bba6ebe1a8ef7c4206aa547d7a" and .conclusion == "success"' source-build.json
           sha256sum incoming/app-debug.apk
 
       - name: Set up Android signing tools
@@ -49,15 +66,15 @@ jobs:
           set -euo pipefail
           mkdir -p compatible-update
           signer="$ANDROID_HOME/build-tools/36.0.0/apksigner"
-          "$signer" sign --ks "$HOME/.config/.android/debug.keystore" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out compatible-update/graywolf-mod-bdc69c12-update.apk incoming/app-debug.apk
-          "$signer" verify --verbose --print-certs compatible-update/graywolf-mod-bdc69c12-update.apk | tee compatible-update/signature-verification.txt
+          "$signer" sign --ks "$HOME/.config/.android/debug.keystore" --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android --out compatible-update/graywolf-mod-f2ee3b9d-update.apk incoming/app-debug.apk
+          "$signer" verify --verbose --print-certs compatible-update/graywolf-mod-f2ee3b9d-update.apk | tee compatible-update/signature-verification.txt
           grep -F 'Signer #1 certificate SHA-256 digest: 5e8aef2ea71a52a84e723974317c6af39549fb9167d6ff8639cb23d7eae299eb' compatible-update/signature-verification.txt
-          (cd compatible-update && sha256sum graywolf-mod-bdc69c12-update.apk > SHA256SUMS.txt)
+          (cd compatible-update && sha256sum graywolf-mod-f2ee3b9d-update.apk > SHA256SUMS.txt)
 
       - name: Upload compatible APK and public verification evidence (no private key)
         uses: actions/upload-artifact@v4
         with:
-          name: graywolf-mod-bdc69c12-compatible-update
+          name: graywolf-mod-f2ee3b9d-compatible-update
           path: compatible-update/
           if-no-files-found: error
           retention-days: 14
