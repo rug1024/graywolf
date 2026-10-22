@@ -18,6 +18,7 @@
   import { Icon, Radio, RadioGroup, Checkbox, Tooltip } from '@chrissnell/chonky-ui';
   import { getConversationPrefs, putConversationPrefs } from '../../api/messages.js';
   import { toasts } from '../../lib/stores.js';
+  import RFPathPicker from './RFPathPicker.svelte';
 
   /** @type {{ kind: 'dm' | 'tactical', threadKey: string }} */
   let { kind, threadKey } = $props();
@@ -28,8 +29,9 @@
   // sendPath: '' (inherit) | 'rf_only' | 'is_only'. waitForAck default true.
   let sendPath = $state('');
   let waitForAck = $state(true);
+  let rfPath = $state(null);
 
-  let overridden = $derived(sendPath !== '' || waitForAck === false);
+  let overridden = $derived(sendPath !== '' || waitForAck === false || rfPath != null);
 
   const sendPathLabel = $derived(
     sendPath === 'rf_only' ? 'RF only'
@@ -43,6 +45,7 @@
     try {
       const p = await getConversationPrefs(kind, threadKey);
       sendPath = p?.send_path ?? '';
+      rfPath = p?.rf_path ?? null;
       waitForAck = p?.wait_for_ack ?? true;
       loaded = true;
     } catch {
@@ -60,7 +63,8 @@
   }
 
   async function persist(next) {
-    const prev = { sendPath, waitForAck };
+    const prev = { sendPath, waitForAck, rfPath };
+    rfPath = next.rfPath === undefined ? rfPath : next.rfPath;
     sendPath = next.sendPath;
     waitForAck = next.waitForAck;
     saving = true;
@@ -68,13 +72,16 @@
       const resp = await putConversationPrefs(kind, threadKey, {
         send_path: sendPath,
         wait_for_ack: waitForAck,
+        rf_path: rfPath,
       });
       // Echo the server's canonical state (a reset returns defaults).
       sendPath = resp?.send_path ?? '';
+      rfPath = resp?.rf_path ?? null;
       waitForAck = resp?.wait_for_ack ?? true;
     } catch {
       sendPath = prev.sendPath;
       waitForAck = prev.waitForAck;
+      rfPath = prev.rfPath;
       toasts.error("Couldn't save routing for this conversation — try again.");
     } finally {
       saving = false;
@@ -135,6 +142,8 @@
       </RadioGroup>
       <p class="panel-hint">Overrides the global send path for this conversation only. Retries follow the same path.</p>
 
+      <hr class="sep" />
+      <RFPathPicker value={rfPath} disabled={saving || !loaded} onChange={value => persist({ sendPath, waitForAck, rfPath: value })} />
       {#if kind === 'dm'}
         <hr class="sep" />
         <label class="ack-row">

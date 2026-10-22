@@ -2731,6 +2731,11 @@ export interface components {
         };
         "dto.ConversationPrefsRequest": {
             /**
+             * @description RFPath overrides the RF packet path for this conversation. Nil
+             *     inherits the operator default; an empty string means direct.
+             */
+            rf_path?: string;
+            /**
              * @description SendPath overrides transport for this conversation. Empty ('')
              *     means "inherit the global fallback policy"; otherwise one of
              *     rf_only | is_only | both.
@@ -2744,6 +2749,7 @@ export interface components {
             wait_for_ack?: boolean;
         };
         "dto.ConversationPrefsResponse": {
+            rf_path?: string;
             send_path?: string;
             thread_key?: string;
             thread_kind?: string;

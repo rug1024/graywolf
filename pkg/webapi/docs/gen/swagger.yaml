@@ -1248,6 +1248,11 @@ definitions:
     type: object
   dto.ConversationPrefsRequest:
     properties:
+      rf_path:
+        description: |-
+          RFPath overrides the RF packet path for this conversation. Nil
+          inherits the operator default; an empty string means direct.
+        type: string
       send_path:
         description: |-
           SendPath overrides transport for this conversation. Empty ('')
@@ -1263,6 +1268,8 @@ definitions:
     type: object
   dto.ConversationPrefsResponse:
     properties:
+      rf_path:
+        type: string
       send_path:
         type: string
       thread_key:

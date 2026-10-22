@@ -88,6 +88,8 @@
    *    onSend?: (text: string, to?: string, channel?: number) => Promise<any>,
    *    channel?: number,
    *    sendDisabled?: boolean,
+   *    beforeSend?: (to: string) => Promise<any>,
+   *    onSent?: () => void,
    *    channelChoice?: number,
    *    channelOptions?: Array<{value: number, label: string}>,
    *    onChannelChange?: (value: any) => void,
@@ -106,6 +108,8 @@
     onSend,
     channel = 0,
     sendDisabled = false,
+    beforeSend,
+    onSent,
     channelChoice = -1,
     channelOptions = [],
     onChannelChange,
@@ -195,20 +199,23 @@
     }
     // Freeze the route for every part, even if new RF arrives mid-send.
     const batchChannel = channel;
+    const batchParts = [...partsList];
     sending = true;
     try {
-      if (partsList.length > 1) {
+      await beforeSend?.(target);
+      if (batchParts.length > 1) {
         // Each slice is already whitespace-aligned to fit PART_SLICE
         // (= APRS_LIMIT - "{N/M} " prefix width). The "{N/M} " prefix
         // is a human-readable hint, NOT APRS-101.
-        for (let i = 0; i < partsList.length; i++) {
-          const tagged = `{${i + 1}/${partsList.length}} ${partsList[i]}`;
+        for (let i = 0; i < batchParts.length; i++) {
+          const tagged = `{${i + 1}/${batchParts.length}} ${batchParts[i]}`;
           await onSend?.(tagged, target, batchChannel);
         }
       } else {
         await onSend?.(body, target, batchChannel);
       }
       text = '';
+      onSent?.();
       autoGrow();
       textareaEl?.focus({ preventScroll: true });
     } finally {

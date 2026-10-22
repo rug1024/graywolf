@@ -28,7 +28,8 @@
   import CredentialsModal from '../components/messages/remote_actions/CredentialsModal.svelte';
   import EmptyStates from '../components/messages/EmptyStates.svelte';
   import { messages as store } from '../lib/messagesStore.svelte.js';
-  import { sendMessage } from '../api/messages.js';
+  import { sendMessage, getConversationPrefs, putConversationPrefs } from '../api/messages.js';
+  import { prepareComposeRouting } from '../components/messages/rf-path.js';
   import { DEFAULT_MAX_MESSAGE_TEXT } from '../lib/settings/messages-preferences-store.svelte.js';
   import { refreshNow } from '../lib/messagesTransport.js';
   import { toasts } from '../lib/stores.js';
@@ -358,6 +359,19 @@
     refreshNow();
   }
 
+  async function prepareNewMessage(to, options) {
+    const key = to.trim().toUpperCase();
+    const kind = store.tacticals.has(key) ? 'tactical' : 'dm';
+    try {
+      await prepareComposeRouting(kind, key, options, {
+        get: getConversationPrefs, put: putConversationPrefs,
+      });
+    } catch (err) {
+      toasts.error("Couldn't save message routing. Nothing was sent; please retry.");
+      throw err;
+    }
+  }
+
   async function handleNewSend(text, to, channel) {
     const res = await optimisticSend(text, to, channel);
     refreshNow();
@@ -595,6 +609,7 @@
 <ComposeNewModal
   bind:open={composeOpen}
   onSend={handleNewSend}
+    onPrepare={prepareNewMessage}
   onClose={closeCompose}
 />
 

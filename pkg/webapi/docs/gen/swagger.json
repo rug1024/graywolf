@@ -9957,6 +9957,10 @@
         "dto.ConversationPrefsRequest": {
             "type": "object",
             "properties": {
+                "rf_path": {
+                    "description": "RFPath overrides the RF packet path for this conversation. Nil\ninherits the operator default; an empty string means direct.",
+                    "type": "string"
+                },
                 "send_path": {
                     "description": "SendPath overrides transport for this conversation. Empty ('')\nmeans \"inherit the global fallback policy\"; otherwise one of\nrf_only | is_only | both.",
                     "type": "string"
@@ -9970,6 +9974,9 @@
         "dto.ConversationPrefsResponse": {
             "type": "object",
             "properties": {
+                "rf_path": {
+                    "type": "string"
+                },
                 "send_path": {
                     "type": "string"
                 },
