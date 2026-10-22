@@ -127,3 +127,7 @@ Wiki-side notes:
 3. Retag contract: if CI fails after the tag is pushed, delete and
    re-tag the same version; do not rewrite the release note. See
    [invariant 5](invariants.md).
+
+### Personal Signal typography
+
+Signal and Signal Night share `web/themes/signal-typography.css`. Inter 4.1 is shipped locally in `web/public/fonts/inter/` with its SIL OFL license, so typography works offline in the embedded web UI and Android APK. Keep `--font-mono` for callsigns, raw packets and terminals. Rebuild the web UI and the Go binary/APK after font changes.

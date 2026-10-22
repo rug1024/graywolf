@@ -64,8 +64,13 @@ func TestMigrateKissSerialTncDefault(t *testing.T) {
 		}
 	}
 
-	if err := migrateKissSerialTncDefault(store.DB()); err != nil {
-		t.Fatalf("migrate: %v", err)
+	// Existing Android installations have already applied BLE migration 30.
+	// The serial repair must still run when upgrading such a database.
+	if err := store.DB().Exec("PRAGMA user_version = 30").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := store.runMigrations(postAutoMigrate); err != nil {
+		t.Fatalf("migrate from fork version 30: %v", err)
 	}
 
 	type got struct {
