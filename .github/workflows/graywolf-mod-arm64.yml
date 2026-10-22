@@ -1,0 +1,82 @@
+name: Graywolf Mod ARM64 (Go + Rust)
+on:
+  push:
+    branches:
+      - graywolf-mod
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-pi-arm64:
+    name: Test and build matching Raspberry Pi ARM64 binaries
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install native build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev pkg-config protobuf-compiler
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Set unified version stamp
+        run: |
+          echo "GRAYWOLF_VERSION=0.14.14-mod" >> "$GITHUB_ENV"
+          echo "GRAYWOLF_GIT_COMMIT=${GITHUB_SHA:0:8}" >> "$GITHUB_ENV"
+
+      - name: Test Go and web
+        run: |
+          go test ./pkg/aprs ./pkg/app ./pkg/igate ./pkg/txgovernor ./pkg/webapi ./pkg/messages
+          npm ci --prefix web --no-audit --no-fund --include=optional
+          npm test --prefix web
+          npm run build --prefix web
+
+      - name: Build Rust modem (native ARM64)
+        run: cargo build --locked --release --bin graywolf-modem
+
+      - name: Build Go application (native ARM64)
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p dist-pi
+          go build -trimpath -ldflags="-s -w -X main.Version=${GRAYWOLF_VERSION} -X main.GitCommit=${GRAYWOLF_GIT_COMMIT}" -o dist-pi/graywolf ./cmd/graywolf/
+          cp target/release/graywolf-modem dist-pi/graywolf-modem
+          chmod +x dist-pi/graywolf dist-pi/graywolf-modem
+
+      - name: Verify matching versions and architectures
+        run: |
+          file dist-pi/graywolf dist-pi/graywolf-modem
+          GO_VERSION="$(dist-pi/graywolf version)"
+          MODEM_VERSION="$(dist-pi/graywolf-modem --version)"
+          echo "graywolf: $GO_VERSION"
+          echo "graywolf-modem: $MODEM_VERSION"
+          test "$GO_VERSION" = "$MODEM_VERSION"
+          test "$GO_VERSION" = "v${GRAYWOLF_VERSION}-${GRAYWOLF_GIT_COMMIT}"
+          (cd dist-pi && sha256sum graywolf graywolf-modem > sha256.txt)
+
+      - name: Upload matched ARM64 executables
+        uses: actions/upload-artifact@v4
+        with:
+          name: graywolf-mod-linux-arm64-go-rust
+          path: dist-pi/
+          retention-days: 14
+          if-no-files-found: error

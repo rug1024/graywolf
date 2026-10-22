@@ -41,6 +41,8 @@
     hasAutoNavFired,
   } from '../../lib/stores/ignoredInvites.js';
   import { timeOfDay } from './time.js';
+  import { receiveRouteLabel } from './receive-route.js';
+  import { channelsStore } from '../../lib/stores/channels.svelte.js';
 
   /** @type {{
    *    msg: any,
@@ -84,6 +86,7 @@
 
   const status = $derived(msg?.status || '');
   const source = $derived(msg?.source || '');
+  const receiveRoute = $derived(receiveRouteLabel(msg, channelsStore.list));
 
   const statusInfo = $derived.by(() => {
     // Tactical outgoing gets the broadcast visual regardless of
@@ -524,6 +527,9 @@
       {/if}
     {/if}
     </div>
+    {#if receiveRoute}
+      <div class="receive-route" data-testid="message-receive-route">{receiveRoute}</div>
+    {/if}
   </div>
 
   {#if showReplyPrivately}
@@ -540,6 +546,16 @@
 </article>
 
 <style>
+  .receive-route {
+    margin: 3px 4px 0;
+    max-width: 100%;
+    font-family: var(--font-sans);
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
   .bubble-wrap {
     display: flex;
     flex-direction: row;

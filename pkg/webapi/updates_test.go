@@ -21,8 +21,8 @@ import (
 // ---------------------------------------------------------------------------
 
 // Fresh DB — no UpdatesConfig row yet. GET returns 200 with
-// enabled=true per the zero-value-on-missing contract (Phase 1 D2).
-func TestGetUpdatesConfig_DefaultEnabled(t *testing.T) {
+// enabled=false for personal builds.
+func TestGetUpdatesConfig_DefaultDisabled(t *testing.T) {
 	srv, _ := newTestServer(t)
 	mux := http.NewServeMux()
 	srv.RegisterRoutes(mux)
@@ -38,8 +38,8 @@ func TestGetUpdatesConfig_DefaultEnabled(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatal(err)
 	}
-	if !resp.Enabled {
-		t.Errorf("Enabled = false, want true (default)")
+	if resp.Enabled {
+		t.Errorf("Enabled = true, want false (default)")
 	}
 }
 

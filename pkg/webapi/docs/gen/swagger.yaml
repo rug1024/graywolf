@@ -1248,6 +1248,11 @@ definitions:
     type: object
   dto.ConversationPrefsRequest:
     properties:
+      rf_path:
+        description: |-
+          RFPath overrides the RF packet path for this conversation. Nil
+          inherits the operator default; an empty string means direct.
+        type: string
       send_path:
         description: |-
           SendPath overrides transport for this conversation. Empty ('')
@@ -1263,6 +1268,8 @@ definitions:
     type: object
   dto.ConversationPrefsResponse:
     properties:
+      rf_path:
+        type: string
       send_path:
         type: string
       thread_key:
@@ -1476,6 +1483,8 @@ definitions:
         type: integer
       rf_channel:
         type: integer
+      rf_to_is_blocklist:
+        type: string
       server:
         type: string
       server_filter:
@@ -1505,6 +1514,8 @@ definitions:
         type: integer
       rf_channel:
         type: integer
+      rf_to_is_blocklist:
+        type: string
       server:
         type: string
       server_filter:
@@ -2552,6 +2563,8 @@ definitions:
         type: string
       connected:
         type: boolean
+      is_to_rf_enabled:
+        type: boolean
       is_to_rf_gated:
         type: integer
       last_connected:
@@ -2560,12 +2573,16 @@ definitions:
         type: integer
       rf_to_is_dropped:
         type: integer
+      rf_to_is_enabled:
+        type: boolean
       rf_to_is_gated:
         type: integer
       server:
         type: string
       simulation_mode:
         type: boolean
+      tx_channel:
+        type: integer
     type: object
   modembridge.AvailableDevice:
     properties:
@@ -2986,10 +3003,14 @@ definitions:
         type: number
       device_rms_dbfs:
         type: number
+      enabled:
+        type: boolean
       id:
         type: integer
       input_device_id:
         type: integer
+      mode:
+        type: string
       modem_type:
         type: string
       name:
@@ -3024,6 +3045,8 @@ definitions:
       connected:
         description: Connected is true while an APRS-IS session is established.
         type: boolean
+      is_to_rf_enabled:
+        type: boolean
       is_to_rf_gated:
         description: Downlinked is the cumulative count of IS packets transmitted on RF.
         type: integer
@@ -3036,6 +3059,9 @@ definitions:
       rf_to_is_dropped:
         description: DroppedOffline is the cumulative count of RF packets dropped because the IS session was offline.
         type: integer
+      rf_to_is_enabled:
+        description: RFToISEnabled is the live RF→APRS-IS master switch, independent of connection and simulation.
+        type: boolean
       rf_to_is_gated:
         description: Gated is the cumulative count of RF packets forwarded to APRS-IS.
         type: integer
@@ -3045,6 +3071,8 @@ definitions:
       simulation_mode:
         description: SimulationMode is true when RF->IS uploads are suppressed for testing.
         type: boolean
+      tx_channel:
+        type: integer
     type: object
   webapi.SystemLogEntry:
     properties:
@@ -5920,6 +5948,32 @@ paths:
       security:
         - CookieAuth: []
       summary: List attached USB serial devices (Android only)
+      tags:
+        - kiss
+  /kiss/ble-device-scan:
+    get:
+      operationId: scanBLEMobilinkd
+      parameters:
+        - description: Scan duration in seconds (default 15, max 60)
+          in: query
+          name: timeout
+          type: integer
+      produces:
+        - text/event-stream
+      responses:
+        "200":
+          description: SSE stream of BLEDevice objects
+        "409":
+          description: scan already in progress
+          schema:
+            $ref: '#/definitions/webtypes.ErrorResponse'
+        "501":
+          description: not available on this platform
+          schema:
+            $ref: '#/definitions/webtypes.ErrorResponse'
+      security:
+        - CookieAuth: []
+      summary: Scan for BLE KISS TNC devices
       tags:
         - kiss
   /kiss/bonded-bt-devices:

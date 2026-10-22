@@ -36,15 +36,15 @@ type ServiceConfigReader interface {
 
 // ServiceConfig wires the Service constructor.
 type ServiceConfig struct {
-	Store         *Store
-	ConfigStore   ServiceConfigReader
-	TxSink        txgovernor.TxSink
-	TxHookReg     txgovernor.TxHookRegistry
-	IGate         IGateLineSender // may be nil (no iGate configured)
-	Bridge        RFAvailability  // may be nil in tests (alwaysRF)
-	StationCache  stationcache.StationStore // optional — Phase 4 autocomplete
-	Logger        *slog.Logger
-	Clock         SenderClock
+	Store        *Store
+	ConfigStore  ServiceConfigReader
+	TxSink       txgovernor.TxSink
+	TxHookReg    txgovernor.TxHookRegistry
+	IGate        IGateLineSender           // may be nil (no iGate configured)
+	Bridge       RFAvailability            // may be nil in tests (alwaysRF)
+	StationCache stationcache.StationStore // optional — Phase 4 autocomplete
+	Logger       *slog.Logger
+	Clock        SenderClock
 	// TxChannel is the RF channel used for outbound messages.
 	// Defaults to 1 when zero.
 	TxChannel uint32
@@ -171,6 +171,7 @@ func NewService(cfg ServiceConfig) (*Service, error) {
 		Logger:         logger.With("component", "messages-preflight"),
 		Clock:          clock,
 		AutoAckChannel: autoAckCh,
+		Preferences:    prefs,
 	})
 	if err != nil {
 		return nil, err
@@ -521,6 +522,14 @@ func (s *Service) SendMessage(ctx context.Context, req SendMessageRequest) (*con
 		InviteTactical: inviteTactical,
 		SendPath:       rowSendPath,
 		Channel:        req.Channel,
+	}
+	if convPrefs != nil && convPrefs.RFPath != nil {
+		path := *convPrefs.RFPath
+		if err := ValidateRFPacketPath(path); err != nil {
+			return nil, err
+		}
+		row.RFPath = &path
+		row.Path = path
 	}
 	// DM requires a msgid; tactical may omit.
 	if kind == ThreadKindDM {

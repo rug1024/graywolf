@@ -1,0 +1,52 @@
+/* Shared typography for the existing Signal palettes. Inter 4.1 is bundled
+ * under SIL OFL (web/public/fonts/inter/LICENSE.txt); no external font request.
+ * Keep --font-mono intact for callsigns, packet data and terminals. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter/InterVariable.woff2') format('woff2');
+}
+
+:root:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) {
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) :is(body, #app, button, input, select, textarea, .btn, .badge, .box-title, .page-title) {
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+}
+
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) .ch-card .ch-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) .ch-card :is(.channel-gates, .ch-stats) {
+  font-size: 13px;
+}
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) .ch-card :is(.gate-state, .kiss-state) {
+  font-weight: 500;
+}
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) .ch-card :is(.ch-modem, .kiss-transport, .indicator, .level-value) {
+  font-size: 12px;
+}
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) :is(.ch-stats, .stat-value, .level-value) {
+  font-variant-numeric: tabular-nums;
+}
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) .ch-card .ch-stats {
+  flex-wrap: wrap;
+}
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) :is(.pkt-srcdst, .pkt-raw, .beacon-callsign) {
+  font-family: var(--font-mono);
+}
+
+/* MapLibre owns station-popup DOM outside Svelte's component scope.
+ * Override its explicit monospace container for the Signal palettes too. */
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) .stn-popup {
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+}
+:root:is([data-theme="signal"], [data-theme="signal-night"], [data-theme="neon-signal"]) .stn-popup :is(.stn-call, .stn-src-call, .stn-coords, .stn-path) {
+  font-family: var(--font-mono);
+}
