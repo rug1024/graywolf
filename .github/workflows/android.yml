@@ -95,6 +95,9 @@ jobs:
           npm test --prefix web
           go test ./pkg/aprs ./pkg/app ./pkg/igate ./pkg/txgovernor ./pkg/webapi
 
+      - name: Race-test Android platform bridge on Linux
+        run: sh scripts/test-platformsvc-host.sh
+
       - name: Set up Rust + Android targets
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -171,7 +174,7 @@ jobs:
           echo "ANDROID_NDK_ROOT=${ANDROID_NDK_ROOT:-<unset>}"
           ls -1 "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/" | grep -E "^(x86_64|aarch64)-linux-android[0-9]+-clang$" | sort
 
-      - name: Run BLE/GPS Android unit tests
+      - name: Run BLE/Bluetooth/GPS Android unit tests
         working-directory: android
         # Keep the Kotlin/platform bridge tests introduced/affected by this
         # integration live in CI. The wider host-JVM test tree also contains
@@ -182,6 +185,7 @@ jobs:
         run: >
           ./gradlew :app:testDebugUnitTest
           --tests 'com.nw5w.graywolf.platformsvc.BleAdapterTest'
+          --tests 'com.nw5w.graywolf.platformsvc.BtSerialAdapterTest'
           --tests 'com.nw5w.graywolf.gps.GpsAdapterTest'
           --no-daemon --stacktrace
 
