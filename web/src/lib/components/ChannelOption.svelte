@@ -152,7 +152,7 @@
     height: 14px;
     line-height: 1;
     font-size: 14px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-sans);
     transition: transform 0.2s ease-out;
   }
   .glyph.live {

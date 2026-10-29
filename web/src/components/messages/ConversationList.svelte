@@ -529,10 +529,11 @@
      when select-mode kicks in), then filter pills, then bulk-delete
      (only when something is selected), then New. */
   .toolbar {
-    display: flex;
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto 28px;
     align-items: center;
     gap: 6px;
-    height: 36px;
+    min-height: 36px;
     padding-bottom: 4px;
   }
   .select-all {
@@ -540,7 +541,7 @@
     align-items: center;
     justify-content: center;
     width: 22px;
-    height: 100%;
+    height: 28px;
     cursor: pointer;
     flex-shrink: 0;
   }
@@ -559,11 +560,11 @@
   .filters {
     display: flex;
     align-items: center;
-    flex-wrap: nowrap;
+    /* Wrap within the filter column; Delete and New have their own
+       reserved columns and can never cover the last filter pill. */
+    flex-wrap: wrap;
     gap: 4px;
-    flex: 1 1 auto;
     min-width: 0;
-    overflow: hidden;
   }
   .pill {
     font-family: var(--font-mono);

@@ -124,7 +124,7 @@
     font-size: 0.9rem;
   }
   .help-banner code {
-    font-family: 'SauceCodePro Nerd Font', ui-monospace, monospace;
+    font-family: var(--font-sans);
     background: var(--accent-bg, rgba(0, 0, 0, 0.05));
     color: var(--text-primary);
     padding: 1px 4px;

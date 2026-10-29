@@ -65,6 +65,18 @@ class PlatformServer(
         btSerialAdapter = adapter
     }
 
+    @Volatile private var bleAdapter: BleAdapter? = null
+
+    /**
+     * Attach the BleAdapter after construction. Same lifecycle contract as
+     * attachBtAdapter: the server must exist before the adapter is built so
+     * its sendMessage callback can close over broadcastBt. Safe to call at
+     * most once during onCreate.
+     */
+    fun attachBleAdapter(adapter: BleAdapter) {
+        bleAdapter = adapter
+    }
+
     @Volatile private var usbSerialAdapter: UsbSerialAdapter? = null
 
     /**
@@ -101,6 +113,12 @@ class PlatformServer(
      */
     private fun broadcast(msg: PlatformMessage) {
         val outs = activeOutputs  // snapshot — CoW List, safe to iterate
+        if (outs.isEmpty() && msg.bodyCase != PlatformMessage.BodyCase.GPS_FIX &&
+            msg.bodyCase != PlatformMessage.BodyCase.GNSS_STATUS) {
+            // A Bluetooth/USB reply with no Hello-registered client is lost,
+            // and the Go caller waits for it until its timeout.
+            Log.w(TAG, "dropping ${msg.bodyCase}: no Hello-registered client connected")
+        }
         for (os in outs) {
             try {
                 synchronized(os) { WireCodec.writeFrame(os, msg) }
@@ -256,28 +274,38 @@ class PlatformServer(
                 when (req.bodyCase) {
                     PlatformMessage.BodyCase.SERIAL_OPEN -> {
                         val req2 = req.serialOpen
-                        if (req2.kind == SerialKind.SERIAL_KIND_USB) {
-                            val adapter = usbSerialAdapter
-                            if (adapter == null) Log.d(TAG, "SERIAL_OPEN(USB) with no UsbSerialAdapter; dropping")
-                            else adapter.handleSerialOpen(req2)
-                        } else {
-                            val adapter = btSerialAdapter
-                            if (adapter == null) Log.d(TAG, "SERIAL_OPEN(BT) with no BtSerialAdapter; dropping")
-                            else adapter.handleSerialOpen(req2)
+                        when (req2.kind) {
+                            SerialKind.SERIAL_KIND_USB -> {
+                                val adapter = usbSerialAdapter
+                                if (adapter == null) Log.d(TAG, "SERIAL_OPEN(USB) with no UsbSerialAdapter; dropping")
+                                else adapter.handleSerialOpen(req2)
+                            }
+                            SerialKind.SERIAL_KIND_BLE -> {
+                                val adapter = bleAdapter
+                                if (adapter == null) Log.d(TAG, "SERIAL_OPEN(BLE) with no BleAdapter; dropping")
+                                else adapter.handleSerialOpen(req2)
+                            }
+                            else -> {
+                                val adapter = btSerialAdapter
+                                if (adapter == null) Log.d(TAG, "SERIAL_OPEN(BT) with no BtSerialAdapter; dropping")
+                                else adapter.handleSerialOpen(req2)
+                            }
                         }
                         continue
                     }
                     PlatformMessage.BodyCase.SERIAL_DATA -> {
                         // Handles are globally unique across transports; each
                         // adapter no-ops a handle it doesn't own, so forward to
-                        // both rather than tracking handle->kind here.
+                        // all adapters rather than tracking handle->kind here.
                         btSerialAdapter?.handleSerialData(req.serialData)
                         usbSerialAdapter?.handleSerialData(req.serialData)
+                        bleAdapter?.handleSerialData(req.serialData)
                         continue
                     }
                     PlatformMessage.BodyCase.SERIAL_CLOSE -> {
                         btSerialAdapter?.handleSerialClose(req.serialClose)
                         usbSerialAdapter?.handleSerialClose(req.serialClose)
+                        bleAdapter?.handleSerialClose(req.serialClose)
                         continue
                     }
                     PlatformMessage.BodyCase.AVAILABLE_USB_SERIAL_DEVICES_REQUEST -> {
@@ -293,6 +321,20 @@ class PlatformServer(
                         } else {
                             adapter.handleBondedRequest()
                         }
+                        continue
+                    }
+                    PlatformMessage.BodyCase.BLE_SCAN_REQUEST -> {
+                        val adapter = bleAdapter
+                        if (adapter == null) Log.d(TAG, "BLE_SCAN_REQUEST with no BleAdapter; dropping")
+                        else adapter.handleScanRequest()
+                        continue
+                    }
+                    PlatformMessage.BodyCase.BLE_SCAN_STOP -> {
+                        bleAdapter?.handleScanStop()
+                        continue
+                    }
+                    PlatformMessage.BodyCase.BLE_REPAIR_REQUEST -> {
+                        bleAdapter?.handleRepairRequest(req.bleRepairRequest)
                         continue
                     }
                     PlatformMessage.BodyCase.USB_LIST_REQ -> {

@@ -146,7 +146,7 @@ export function listConversations(params) {
  * wait_for_ack true) when no override row exists, never 404.
  * @param {string} kind 'dm' | 'tactical'
  * @param {string} key  peer callsign (dm) or tactical label
- * @returns {Promise<{thread_kind: string, thread_key: string, send_path: string, wait_for_ack: boolean}>}
+ * @returns {Promise<{thread_kind: string, thread_key: string, send_path: string, wait_for_ack: boolean, rf_path?: string | null}>}
  */
 export function getConversationPrefs(kind, key) {
   return api.get(`/messages/conversations/${encodeURIComponent(kind)}/${encodeURIComponent(key)}/prefs`);
@@ -157,7 +157,7 @@ export function getConversationPrefs(kind, key) {
  * override. Sending the defaults clears the row server-side.
  * @param {string} kind 'dm' | 'tactical'
  * @param {string} key  peer callsign (dm) or tactical label
- * @param {{send_path: string, wait_for_ack: boolean}} req
+ * @param {{send_path: string, wait_for_ack: boolean, rf_path?: string | null}} req
  */
 export function putConversationPrefs(kind, key, req) {
   return api.put(`/messages/conversations/${encodeURIComponent(kind)}/${encodeURIComponent(key)}/prefs`, req);

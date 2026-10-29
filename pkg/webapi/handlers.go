@@ -24,6 +24,14 @@ type validationErr struct{ err error }
 func (v validationErr) Error() string { return v.err.Error() }
 func (v validationErr) Unwrap() error { return v.err }
 
+// rejectRequest logs a 400 before writing it. Validation failures are
+// otherwise invisible in System Logs, and the toast that carries them in
+// the UI is easy to miss on a tablet (GH #573).
+func (s *Server) rejectRequest(w http.ResponseWriter, r *http.Request, op string, err error) {
+	s.logger.WarnContext(r.Context(), "webapi request rejected", "op", op, "err", err)
+	badRequest(w, err.Error())
+}
+
 // validationError wraps err as a handler-level validation failure so
 // handleCreate / handleUpdate turn it into a 400 response. Callers pass
 // the original error; the wrapper stores it verbatim and surfaces the
@@ -124,17 +132,17 @@ func handleCreate[TReq dto.Validator, TModel any, TResp any](
 ) {
 	req, err := decodeJSON[TReq](r)
 	if err != nil {
-		badRequest(w, err.Error())
+		s.rejectRequest(w, r, op, err)
 		return
 	}
 	if err := req.Validate(); err != nil {
-		badRequest(w, err.Error())
+		s.rejectRequest(w, r, op, err)
 		return
 	}
 	m, err := create(r.Context(), req)
 	if err != nil {
 		if v := isValidationErr(err); v != nil {
-			badRequest(w, v.Error())
+			s.rejectRequest(w, r, op, v)
 			return
 		}
 		s.internalError(w, r, op, err)
@@ -157,17 +165,17 @@ func handleUpdate[TReq dto.Validator, TModel any, TResp any](
 ) {
 	req, err := decodeJSON[TReq](r)
 	if err != nil {
-		badRequest(w, err.Error())
+		s.rejectRequest(w, r, op, err)
 		return
 	}
 	if err := req.Validate(); err != nil {
-		badRequest(w, err.Error())
+		s.rejectRequest(w, r, op, err)
 		return
 	}
 	m, err := update(r.Context(), id, req)
 	if err != nil {
 		if v := isValidationErr(err); v != nil {
-			badRequest(w, v.Error())
+			s.rejectRequest(w, r, op, v)
 			return
 		}
 		s.internalError(w, r, op, err)

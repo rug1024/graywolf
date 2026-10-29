@@ -138,7 +138,7 @@
     font-weight: 600;
   }
   .algo {
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-sans);
     font-size: 12px;
   }
   .muted {

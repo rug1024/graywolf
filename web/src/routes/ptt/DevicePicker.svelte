@@ -115,7 +115,7 @@
   .device-card.selected { border-color: var(--accent, #3b82f6); background: var(--bg-selected, #eff6ff); }
   .device-card-muted { opacity: 0.85; }
   .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  .path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--text-secondary, #555); }
+  .path { font-family: var(--font-sans); font-size: 12px; color: var(--text-secondary, #555); }
   .usb { font-size: 11px; color: var(--text-muted, #888); }
   .warning { font-size: 12px; color: #b45309; }
   .empty { padding: 12px; color: var(--text-muted, #888); text-align: center; }

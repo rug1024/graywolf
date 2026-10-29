@@ -100,3 +100,24 @@ func mustIgate(t *testing.T) *Igate {
 	}
 	return ig
 }
+
+func TestRFToISMasterSwitch(t *testing.T) {
+	ig := mustIgate(t)
+	out := NewIgateOutput(ig)
+	pkt := &aprs.DecodedAPRSPacket{
+		Source: "W5ABC-7", Dest: "APRS",
+		Raw: buildRawFrame(t, "W5ABC-7", "APRS", nil, ">RF to IS toggle"),
+		Type: aprs.PacketStatus,
+	}
+	ig.SetRFToISEnabled(false)
+	if got := out.GateClientTx(context.Background(), pkt); got != GateReasonDisabled {
+		t.Fatalf("disabled RF→IS got %q, want %q", got, GateReasonDisabled)
+	}
+	if !ig.heard.HeardWithin(pkt.Source, heardDirectTTL) {
+		t.Fatal("disabled uplink incorrectly prevented heard-direct tracking")
+	}
+	ig.SetRFToISEnabled(true)
+	if got := out.GateClientTx(context.Background(), pkt); got != GateReasonOffline {
+		t.Fatalf("re-enabled RF→IS got %q, want offline", got)
+	}
+}

@@ -44,7 +44,7 @@
   --color-btn-bg: #eaeaea;
   --color-btn-bg-hover: #dcdcdc;
   --color-btn-border: #595959;
-  --font-mono: 'Inconsolata', 'Courier New', monospace;
+  --font-mono: var(--font-sans);
   --radius: 2px;
   /* Map overlay tokens (used by MapLibre Live Map rebuild) */
   /* High-contrast keeps overlays fully opaque with no blur so chrome text
