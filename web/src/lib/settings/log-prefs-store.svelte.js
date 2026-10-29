@@ -14,14 +14,14 @@
 //                 ordinary operators see clean text, and only those
 //                 diagnosing a malformed packet opt into the noise.
 //   newestFirst — reverse the packet log so the most recent packet sits at
-//                 the top instead of the bottom (GH #519). Off by default so
-//                 existing operators keep the chronological (oldest-first)
-//                 order they're used to; the viewer suppresses bottom
+//                 the top instead of the bottom (GH #519). On by default for new
+//                 installs so the latest activity is immediately visible;
+//                 the viewer suppresses bottom
 //                 auto-scroll while this is on, since new packets now arrive
 //                 at the top.
 //
 // autoRefresh / autoScroll default on, preserving the prior always-live
-// behavior; showNonPrintable / newestFirst default off.
+// behavior; showNonPrintable defaults off and newestFirst defaults on.
 
 const LS_AUTO_REFRESH = 'aprs-log-auto-refresh';
 const LS_AUTO_SCROLL = 'aprs-log-auto-scroll';
@@ -45,7 +45,7 @@ export const logPrefsState = (() => {
   let autoRefresh = $state(readBool(LS_AUTO_REFRESH, true));
   let autoScroll = $state(readBool(LS_AUTO_SCROLL, true));
   let showNonPrintable = $state(readBool(LS_SHOW_NONPRINTABLE, false));
-  let newestFirst = $state(readBool(LS_NEWEST_FIRST, false));
+  let newestFirst = $state(readBool(LS_NEWEST_FIRST, true));
 
   return {
     get autoRefresh() { return autoRefresh; },

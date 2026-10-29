@@ -13,18 +13,18 @@ import (
 
 // GetUpdatesConfig returns the singleton updates-check configuration
 // row. When no row exists (fresh install), returns
-// UpdatesConfig{Enabled: true} with no error — the feature is on by
+// UpdatesConfig{Enabled: false} with no error — the feature is off by
 // default and callers don't need a separate seed step. DB errors other
 // than not-found are returned verbatim. Mirrors the shape of
 // GetStationConfig but with a different zero-value-on-missing contract:
 // StationConfig's zero value ("unconfigured") is also the safe default,
-// whereas UpdatesConfig's safe default is Enabled=true, which differs
-// from the Go zero value.
+// and UpdatesConfig's safe default is Enabled=false, matching the Go
+// zero value.
 func (s *Store) GetUpdatesConfig(ctx context.Context) (UpdatesConfig, error) {
 	var c UpdatesConfig
 	err := s.db.WithContext(ctx).Order("id").First(&c).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return UpdatesConfig{Enabled: true}, nil
+		return UpdatesConfig{Enabled: false}, nil
 	}
 	if err != nil {
 		return UpdatesConfig{}, err
@@ -37,10 +37,10 @@ func (s *Store) GetUpdatesConfig(ctx context.Context) (UpdatesConfig, error) {
 // so Save updates in place. Unlike StationConfig there is no value to
 // normalize (Enabled is a bool).
 //
-// GORM footgun: the column carries `default:true`, so a plain
-// Create with Enabled=false would be silently rewritten to true on
-// insert (GORM treats bool zero-values with a default tag as "unset,
-// use default"). To defeat that we build the insert via a map, which
+// GORM footgun: bool zero-values can be omitted by GORM when a column has a
+// default, so a plain
+// Create with Enabled=false may be treated as "unset". To keep explicit
+// false writes unambiguous we build the insert via a map, which
 // sends every column value verbatim. For updates we do the same with
 // UpdateColumns so Enabled=false is always honored.
 func (s *Store) UpsertUpdatesConfig(ctx context.Context, c UpdatesConfig) error {

@@ -47,6 +47,10 @@
     }
   });
 
+  function handleCallsignInput(e) {
+    callsign = e.currentTarget.value.toUpperCase();
+  }
+
   async function handleSave(e) {
     e.preventDefault();
     if (saving) return;
@@ -117,7 +121,8 @@
         <Input
           id="station-callsign"
           class="callsign-input"
-          bind:value={callsign}
+          value={callsign}
+          oninput={handleCallsignInput}
           placeholder="e.g. KE7XYZ-9"
           autocomplete="off"
           spellcheck={false}

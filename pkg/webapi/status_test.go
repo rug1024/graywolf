@@ -142,3 +142,10 @@ func TestHandleStatus_Demo(t *testing.T) {
 		t.Error("demo should report an igate section")
 	}
 }
+
+func TestStatusIgateLiveRoutingProjection(t *testing.T) {
+	got := newStatusIgateDTO(igate.Status{TxChannel: 4, IsToRFEnabled: true, SimulationMode: true})
+	if got.TxChannel != 4 || !got.IsToRFEnabled || !got.SimulationMode {
+		t.Fatalf("live routing fields lost: %+v", got)
+	}
+}
