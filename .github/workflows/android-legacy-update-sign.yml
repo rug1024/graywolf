@@ -76,10 +76,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api 'repos/rug1024/graywolf/contents/docs/INSTALL-MOD.txt?ref=58d45c961a4bb9c769f0feab649bef59fe09f955' --jq .content \\
-            | base64 --decode \\
-            | sed -e 's/__VERSION__/v0.14.14-mod-58d45c96/g' -e 's/__COMMIT__/58d45c96/g' \\
-            > compatible-update/INSTALL.txt
+          gh api 'repos/rug1024/graywolf/contents/docs/INSTALL-MOD.txt?ref=58d45c961a4bb9c769f0feab649bef59fe09f955' --jq .content | base64 --decode | sed -e 's/__VERSION__/v0.14.14-mod-58d45c96/g' -e 's/__COMMIT__/58d45c96/g' > compatible-update/INSTALL.txt
 
       - name: Upload compatible APK and public verification evidence (no private key)
         uses: actions/upload-artifact@v4
