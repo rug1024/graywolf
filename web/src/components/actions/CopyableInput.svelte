@@ -117,7 +117,7 @@
     min-width: 0;
   }
   .row :global(input.mono) {
-    font-family: 'SauceCodePro Nerd Font', ui-monospace, monospace;
+    font-family: var(--font-sans);
     letter-spacing: 0.04em;
   }
   .sr-only {

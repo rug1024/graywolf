@@ -1189,13 +1189,13 @@
     gap: 8px;
   }
   .wildcard-pattern code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: var(--font-sans);
     font-size: 12px;
     color: var(--color-warning, #d4a72c);
     font-style: italic;
   }
   .literal-pattern {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: var(--font-sans);
     font-size: 12px;
     color: var(--text-primary);
   }
@@ -1215,7 +1215,7 @@
     background: var(--color-surface, var(--bg-surface, transparent));
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font: 13px/1.5 var(--font-sans);
     resize: vertical;
   }
   .blocklist-textarea:focus-visible {
@@ -1237,7 +1237,7 @@
     text-decoration: underline;
   }
   .field-note code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: var(--font-sans);
     font-size: 11px;
     padding: 1px 4px;
     background: rgba(0, 0, 0, 0.08);

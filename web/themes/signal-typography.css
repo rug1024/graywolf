@@ -1,6 +1,7 @@
-/* Shared typography for the existing Signal palettes. Inter 4.1 is bundled
- * under SIL OFL (web/public/fonts/inter/LICENSE.txt); no external font request.
- * Keep --font-mono intact for callsigns, packet data and terminals. */
+/* Inter 4.1 is bundled for every palette under SIL OFL
+ * (web/public/fonts/inter/LICENSE.txt); no external font request.
+ * The legacy --font-mono token aliases Inter for UI, callsigns and packets.
+ * Only the fixed-cell terminal renderer keeps its own monospace font. */
 @font-face {
   font-family: 'Inter';
   font-style: normal;

@@ -73,6 +73,12 @@ jobs:
           test "$GO_VERSION" = "v${GRAYWOLF_VERSION}-${GRAYWOLF_GIT_COMMIT}"
           (cd dist-pi && sha256sum graywolf graywolf-modem > sha256.txt)
 
+      - name: Include installation instructions
+        run: |
+          sed -e "s/__VERSION__/v${GRAYWOLF_VERSION}-${GRAYWOLF_GIT_COMMIT}/g" \
+              -e "s/__COMMIT__/${GRAYWOLF_GIT_COMMIT}/g" \
+              docs/INSTALL-MOD.txt > dist-pi/INSTALL.txt
+
       - name: Upload matched ARM64 executables
         uses: actions/upload-artifact@v4
         with:

@@ -38,7 +38,7 @@
   --color-btn-bg: #172033;
   --color-btn-bg-hover: #22304a;
   --color-btn-border: #334155;
-  --font-mono: 'Inconsolata', 'Courier New', monospace;
+  --font-mono: var(--font-sans);
   --radius: 6px;
 
   --map-overlay-bg: color-mix(in srgb, var(--color-surface) 88%, transparent);

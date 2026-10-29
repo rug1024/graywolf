@@ -1852,33 +1852,20 @@ Source: [`../../pkg/messages/store.go`](../../pkg/messages/store.go)
 [`../../web/src/lib/messagesTransport.js`](../../web/src/lib/messagesTransport.js)
 (`fetchDelta`).
 
-### 64. Web UI renders in Inconsolata everywhere; no system/Helvetica stack
+### 64. The mod uses bundled Inter consistently across the web UI
 
-Every visible glyph in the web UI is Inconsolata. The font is applied
-through the `--font-mono` custom property (`'Inconsolata', 'Courier New',
-monospace`), set on `body` by both `chonky-ui` and `web/src/app.css` and
-inherited by headings and controls. Component CSS must not override
-`font-family` with a system stack (`-apple-system`, `BlinkMacSystemFont`,
-`system-ui`, `'Helvetica Neue'`, `Arial`, `sans-serif`); use
-`var(--font-mono)`. The Messages surface (bubbles, invite text, compose
-box) once carried an iOS-style stack "to feel like messaging" -- that was
-removed so the product reads as one typeface (graywolf #576).
+All palettes use bundled Inter for controls, headings, callsigns, logs,
+raw packets and station popups. `--font-sans` defines the shared stack;
+`--font-mono` remains a compatibility alias to it for existing components
+and chonky-ui. Component CSS must use these tokens rather than hardcoded
+system monospace stacks. Inter is served locally, including offline.
 
-*Why:* a lone component reintroducing the platform font is exactly the
-regression this issue fixed; it looks like a native iOS control dropped
-into an otherwise-monospace app.
+Intentional rendering exceptions:
 
-Two intentional exceptions, neither a UI text font:
-
-- Emoji-only spans (e.g. the `.bolt` zap glyph) use an `'Apple Color
-  Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', system-ui, sans-serif`
-  stack to render color emoji, not Latin text.
-- MapLibre label layers name glyph sets (`'Open Sans ...'`, `'Arial
-  Unicode MS ...'` in `web/src/lib/map/layers/fronts.js`) that must match
-  the tile server's font stack; these are map-render font names, not CSS.
-
-The per-tab page header (`web/src/components/PageHeader.svelte`,
-`.page-title`) is pinned to `var(--font-mono)` at 22px.
+- Emoji-only spans retain the platform's color-emoji font stack.
+- MapLibre glyph stacks must match fonts provided by the tile server.
+- The xterm terminal canvas retains a monospace font because its protocol
+  display uses a fixed character grid. Its surrounding controls use Inter.
 
 ### 65. The chat window reads a thread as a "tail window" (newest by id), not the forward cursor page
 
@@ -2215,3 +2202,24 @@ guards.
 
 Source: [`../../web/src/routes/Kiss.svelte`](../../web/src/routes/Kiss.svelte)
 (`bondedAutoLoaded`, `usbAutoLoaded`, `serialPortsAutoLoaded`).
+
+### 73. A beacon created with `enabled=false` stays disabled
+
+`Beacon.Enabled` keeps its gorm `default:true` (the DDL stays unchanged,
+as for KISS), and with that tag gorm sends `true` for a Go `false` on
+INSERT. `CreateBeacon` captures the requested value and re-asserts
+`false` after the insert (the `CreateKissInterface` pattern), with the
+insert and the re-assert in one transaction, so a failed re-assert
+leaves no enabled row. `BeaconRequest.Enabled` is a `*bool`: an omitted
+key still creates an enabled beacon (the KISS/channel rule).
+
+*Why:* the scheduler skips only disabled beacons (`buildHeap`), so a
+beacon stored enabled against the request transmits on its schedule.
+
+Source: [`../../pkg/configstore/store.go`](../../pkg/configstore/store.go)
+(`CreateBeacon`), [`../../pkg/webapi/dto/beacon.go`](../../pkg/webapi/dto/beacon.go)
+(`BeaconRequest`);
+[`../../pkg/webapi/beacons_test.go`](../../pkg/webapi/beacons_test.go)
+(`TestBeaconCreate_EnabledFlag`),
+[`../../pkg/configstore/beacon_create_test.go`](../../pkg/configstore/beacon_create_test.go)
+(`TestCreateBeacon_DisabledIsAtomic`).

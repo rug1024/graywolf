@@ -22,7 +22,8 @@
   --success: var(--color-success);
   --error: var(--color-danger);
   --warning: var(--color-warning);
-  --font-sans: var(--font-mono);
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: var(--font-sans);
   --sidebar-width: 220px;
   /* Compact left rail shown in place of the full sidebar on small
      landscape phones (GH #419). Kept narrow so the map keeps almost the

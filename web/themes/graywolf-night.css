@@ -42,7 +42,7 @@
   --color-btn-bg: #1e1e1e;
   --color-btn-bg-hover: #2a2a2a;
   --color-btn-border: #2a2a2a;
-  --font-mono: 'Inconsolata', 'Courier New', monospace;
+  --font-mono: var(--font-sans);
   --radius: 6px;
   /* Map overlay tokens (used by MapLibre Live Map rebuild) */
   /* Translucent so the map reads through the chrome; the matching

@@ -244,7 +244,7 @@
     color: var(--color-text-muted, var(--text-muted));
   }
   .explainer code {
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-sans);
     font-size: 11px;
     background: var(--accent-bg, rgba(0, 0, 0, 0.05));
     padding: 1px 4px;

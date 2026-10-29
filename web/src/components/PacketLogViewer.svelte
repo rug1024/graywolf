@@ -115,10 +115,10 @@
   // Column definitions. ORDER IS LOAD-BEARING — first 3 are primary on mobile.
   // No `priority` field in Chonky 0.2.1; ordering is the only knob.
   const columns = [
-    { key: 'timestamp', label: 'Time',    width: '130px', class: 'pkt-c-time',           render: timeCell    },
-    { key: 'type',      label: 'Type',    width: '130px', class: 'pkt-c-type',           render: typeCell    },
-    { key: 'srcdst',    label: 'Src→Dst', width: 'minmax(160px, 1fr)', class: 'pkt-c-srcdst',         render: srcDstCell  },
-    { key: 'metadata',  label: 'Details', width: 'minmax(320px, 1.3fr)', class: 'pkt-c-metadata', render: metadataCell },
+    { key: 'timestamp', label: 'Time',    width: '160px', class: 'pkt-c-time',           render: timeCell    },
+    { key: 'type',      label: 'Type',    width: '100px', class: 'pkt-c-type',           render: typeCell    },
+    { key: 'srcdst',    label: 'Src→Dst', width: 'minmax(220px, 1.5fr)', class: 'pkt-c-srcdst',         render: srcDstCell  },
+    { key: 'metadata',  label: 'Details', width: 'minmax(360px, 1fr)', class: 'pkt-c-metadata', render: metadataCell },
   ];
 </script>
 
@@ -161,6 +161,8 @@
           <line x1="13" y1="8" x2="15.5" y2="8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
         </svg>
       </a>
+    {:else}
+      <span class="pkt-locate-space" aria-hidden="true"></span>
     {/if}
     <span class="pkt-src">{calls.src || '—'}</span>
     <span class="pkt-arrow" aria-hidden="true">→</span>
@@ -189,13 +191,13 @@
       </span>
     {/if}
     <span class="pkt-meta-item">
-      <span class="pkt-meta-label">Channel:</span>
+      <span class="pkt-meta-label">Ch:</span>
       <span>{entry.channel_name || (entry.channel ?? '—')}</span>
     </span>
     <span class="pkt-meta-item">
-      <span class="pkt-meta-label">Distance:</span>
+      <span class="pkt-meta-label">Dist:</span>
       {#if entry.distance_mi != null}
-        <span class="pkt-distance">{formatDistance(entry.distance_mi)}</span>
+        <span class="pkt-distance">{formatDistance(entry.distance_mi, 0)}</span>
       {:else}
         <span class="pkt-dim">—</span>
       {/if}
@@ -262,6 +264,10 @@
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .pkt-locate-space {
+    width: 13px;
+    flex-shrink: 0;
   }
   .pkt-src {
     color: var(--color-warning);

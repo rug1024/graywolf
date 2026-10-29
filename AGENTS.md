@@ -15,3 +15,15 @@ When delivering an Android APK from this fork as an update to the user's install
 # Build cadence
 
 Collect proposed changes first. Only start Pi or Android builds when the user explicitly requests a build. Pushing graywolf-mod updates triggers builds automatically, so hold those pushes until a build is authorized. Read-only investigation and preparing changes remain allowed.
+
+# Installation instructions with build deliveries
+
+Every future build delivery must include a plain-text installation guide as a downloadable `.txt` file. Include the exact artifact names and the Raspberry Pi commands for checksum verification, stopping the service, backing up binaries and data into separate `bin/` and `data/` directories, installing both executables, restarting, and checking the version/service. The installed paths are `/usr/bin/graywolf`, `/usr/bin/graywolf-modem`, and `/var/lib/graywolf`; the service is `graywolf.service`. Include Android update steps when an APK is delivered, preserving the installed app and its settings. Do not trigger a build just to add or update the installation guide. For the 2026-10-25 delivery the user explicitly requested the commands in chat only.
+
+# APRS log corrections included in the next authorized build (2026-10-29)
+
+- Move DETAILS back to the right; the user explicitly withdrew the proposal to move it farther left.
+- Shorten `Channel:` to `Ch:` and `Distance:` to `Dist:`.
+- Round displayed distances to whole kilometres, without decimal places.
+- Keep the compact row spacing and the full-width raw packet line.
+- Inter is used across the mod UI and palettes; the user authorized a new Pi/Android build on 2026-10-29, including upstream PR #612 and the collected changes.
