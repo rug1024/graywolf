@@ -25,3 +25,5 @@ disconnected. It does not backfill messages from before the firmware update.
 The mailbox protocol has no reception timestamp or original APRS message
 number. Re-importing a mailbox record is deduplicated. An RF retry delivered
 live after reconnect can still appear separately.
+
+Record the Android build ID and tracker firmware revision before testing.
