@@ -38,6 +38,8 @@ type clientImpl struct {
 	bleScanSubs      []chan<- *pb.BleScanResult
 	bleScanErrSubs   []chan<- *pb.BleScanError
 	bleRepairAckSubs []chan<- *pb.BleRepairAck
+	historyReplies   map[uint32]chan *pb.BleHistoryResponse
+	historyImport    func(context.Context, string, TrackerHistoryRecord) error
 
 	// Single in-flight request → response correlation. The platform proto
 	// has no request_id field, so we serialize requests through reqLine, a
@@ -262,6 +264,14 @@ func (c *clientImpl) dispatch(msg *pb.PlatformMessage) {
 			case s <- b.BleRepairAck:
 			default:
 			}
+		}
+	case *pb.PlatformMessage_BleHistoryResponse:
+		c.subsMu.Lock()
+		ch := c.historyReplies[b.BleHistoryResponse.GetRequestId()]
+		c.subsMu.Unlock()
+		select {
+		case ch <- b.BleHistoryResponse:
+		default:
 		}
 	case *pb.PlatformMessage_SerialOpenAck:
 		c.deliverSerialHandle(b.SerialOpenAck.GetHandle(), msg)

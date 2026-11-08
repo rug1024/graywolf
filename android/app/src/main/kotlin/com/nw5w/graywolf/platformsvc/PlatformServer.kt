@@ -333,6 +333,10 @@ class PlatformServer(
                         bleAdapter?.handleScanStop()
                         continue
                     }
+                    PlatformMessage.BodyCase.BLE_HISTORY_REQUEST -> {
+                        bleAdapter?.handleHistory(req.bleHistoryRequest)
+                        continue
+                    }
                     PlatformMessage.BodyCase.BLE_REPAIR_REQUEST -> {
                         bleAdapter?.handleRepairRequest(req.bleRepairRequest)
                         continue

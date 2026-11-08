@@ -47,6 +47,8 @@ interface BleGattSession {
     fun onDisconnect(cb: () -> Unit)
     /** Tear down the GATT connection. */
     fun close()
+    /** Read an optional tracker mailbox record; null means unsupported. */
+    fun readHistory(cursor: ByteArray): ByteArray? = null
 }
 
 /** Production implementation backed by android.bluetooth. */
@@ -188,7 +190,32 @@ class SystemBleGattSession(
     @Volatile private var writePending = false
     @Volatile private var writeStatus = BluetoothGatt.GATT_SUCCESS
 
+    private val historyService = UUID.fromString("a667645a-7364-4ec3-82b0-7066a8b6a001")
+    private val historyRecord = UUID.fromString("a667645a-7364-4ec3-82b0-7066a8b6a002")
+    private var historyReadPending = false
+    private var historyValue: ByteArray? = null
+    private var pendingWriteUUID: UUID? = null
+    private var historyFailed = false
+
     private val gattCallback = object : BluetoothGattCallback() {
+        override fun onCharacteristicRead(g: BluetoothGatt, c: BluetoothGattCharacteristic, value: ByteArray, status: Int) {
+            if (c.uuid != historyRecord) return
+            writeLock.lock()
+            try {
+                if (historyReadPending) {
+                    historyValue = if (status == BluetoothGatt.GATT_SUCCESS) value.copyOf() else null
+                    historyReadPending = false
+                    writeReady.signalAll()
+                }
+            } finally { writeLock.unlock() }
+        }
+
+        @Deprecated("Deprecated in Java")
+        @Suppress("DEPRECATION")
+        override fun onCharacteristicRead(g: BluetoothGatt, c: BluetoothGattCharacteristic, status: Int) {
+            onCharacteristicRead(g, c, c.value ?: byteArrayOf(), status)
+        }
+
         override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
             when {
                 newState == BluetoothGatt.STATE_CONNECTED && status == BluetoothGatt.GATT_SUCCESS -> {
@@ -256,6 +283,7 @@ class SystemBleGattSession(
         ) {
             writeLock.lock()
             try {
+                if (!writePending || characteristic.uuid != pendingWriteUUID) return
                 writeStatus = status
                 writePending = false
                 writeReady.signalAll()
@@ -424,6 +452,7 @@ class SystemBleGattSession(
                 // clears the flag and records the ATT status.
                 writeLock.lock()
                 try {
+                    pendingWriteUUID = rc.uuid
                     writeStatus = BluetoothGatt.GATT_SUCCESS
                     writePending = true
                 } finally {
@@ -472,11 +501,50 @@ class SystemBleGattSession(
         }
     }
 
+    @Suppress("DEPRECATION")
+    override fun readHistory(cursor: ByteArray): ByteArray? {
+        require(cursor.size == 12)
+        if (historyFailed || state != State.READY) throw IOException("BLE: history session unavailable")
+        val g = gatt ?: throw IOException("BLE: GATT session closed")
+        val c = g.getService(historyService)?.getCharacteristic(historyRecord) ?: return null
+        try {
+            writeLock.lock()
+            try {
+                pendingWriteUUID = c.uuid
+                writePending = true
+                val queued = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    g.writeCharacteristic(c, cursor, BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT) == BluetoothStatusCodes.SUCCESS
+                } else {
+                    c.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                    c.value = cursor
+                    g.writeCharacteristic(c)
+                }
+                if (!queued) throw IOException("BLE: history cursor write could not be queued")
+            } finally { writeLock.unlock() }
+            awaitWriteResponse()
+            writeLock.lock()
+            try {
+                historyValue = null
+                historyReadPending = true
+                if (!g.readCharacteristic(c)) throw IOException("BLE: history read could not be queued")
+                var remaining = java.util.concurrent.TimeUnit.SECONDS.toNanos(5)
+                while (historyReadPending && remaining > 0) remaining = writeReady.awaitNanos(remaining)
+                return historyValue ?: throw IOException("BLE: history read failed or timed out")
+            } finally { writeLock.unlock() }
+        } catch (e: Exception) {
+            // Do not reuse an ambiguous operation after a timeout on this connection.
+            historyFailed = true
+            failPendingWrite()
+            throw e
+        }
+    }
+
     private fun failPendingWrite(status: Int = BluetoothGatt.GATT_FAILURE) {
         writeLock.lock()
         try {
             writeStatus = status
             writePending = false
+            historyReadPending = false
             writeReady.signalAll()
         } finally {
             writeLock.unlock()

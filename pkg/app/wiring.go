@@ -1127,6 +1127,7 @@ func (a *App) wireMessages(ctx context.Context) error {
 		return fmt.Errorf("messages service init: %w", err)
 	}
 	a.msgSvc = svc
+	a.wireTrackerHistory()
 	return nil
 }
 

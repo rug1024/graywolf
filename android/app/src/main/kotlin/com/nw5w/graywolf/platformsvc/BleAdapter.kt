@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -172,6 +173,23 @@ class BleAdapter(
                     closeQuietly(handle, "write failed")
                 }
             }
+        }
+    }
+
+    fun handleHistory(req: com.nw5w.graywolf.platformproto.BleHistoryRequest) {
+        scope.launch {
+            val response = com.nw5w.graywolf.platformproto.BleHistoryResponse.newBuilder()
+                .setRequestId(req.requestId)
+            val state = handles[req.handle.toUInt()]
+            try {
+                if (state == null) throw IOException("BLE history handle closed")
+                val record = state.writeMutex.withLock { state.session.readHistory(req.cursor.toByteArray()) }
+                if (record == null) response.setUnsupported(true)
+                else response.setRecord(ByteString.copyFrom(record))
+            } catch (e: Exception) {
+                response.setFailed(true)
+            }
+            sendMessage(PlatformMessage.newBuilder().setBleHistoryResponse(response).build())
         }
     }
 

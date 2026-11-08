@@ -816,8 +816,12 @@ type Message struct {
 	SentAt     *time.Time `json:"sent_at,omitempty"`
 	AckedAt    *time.Time `json:"acked_at,omitempty"`
 	AckState   string     `gorm:"size:16;not null;default:'none'" json:"ack_state"` // none | acked | rejected | broadcast
-	Source     string     `gorm:"size:4;not null;default:''" json:"source"`         // rf | is (string form of aprs.Direction)
+	Source     string     `gorm:"size:4;not null;default:''" json:"source"`         // rf | is | sim | hist (tracker history)
 	Channel    uint32     `gorm:"not null;default:0" json:"channel"`
+
+	// TrackerImportKey identifies a historical message across BLE retries.
+	TrackerImportKey *string `gorm:"uniqueIndex" json:"-"`
+
 	// RFPath is an outgoing path snapshot: nil inherits the global path; empty means direct.
 	RFPath        *string    `gorm:"size:128" json:"rf_path,omitempty"`
 	Path          string     `gorm:"size:64" json:"path"`                      // display path, e.g. "W1ABC*,WIDE1-1*"

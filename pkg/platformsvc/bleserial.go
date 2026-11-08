@@ -83,13 +83,19 @@ func (c *clientImpl) ScanBLEKISS(ctx context.Context, discovered func(BLEKISSDev
 // protocol with SERIAL_KIND_BLE. The returned ReadWriteCloser is multiplexed
 // on the shared UDS connection; Close tears down the GATT link server-side.
 func (c *clientImpl) BLEOpen(ctx context.Context, addr string) (io.ReadWriteCloser, error) {
-	return c.openSerialStream(ctx, func(handle uint32) *pb.SerialOpen {
+	var serialHandle uint32
+	stream, err := c.openSerialStream(ctx, func(handle uint32) *pb.SerialOpen {
+		serialHandle = handle
 		return &pb.SerialOpen{
 			Handle:  handle,
 			Kind:    pb.SerialKind_SERIAL_KIND_BLE,
 			Address: addr,
 		}
 	})
+	if err == nil && c.historyImport != nil {
+		go c.syncBLEHistory(serialHandle, addr, stream.(*serialReadWriteCloser).closed)
+	}
+	return stream, err
 }
 
 // BLERepair sends a BleRepairRequest to remove the Android bond for mac.

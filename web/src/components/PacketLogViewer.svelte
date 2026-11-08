@@ -116,7 +116,7 @@
   // No `priority` field in Chonky 0.2.1; ordering is the only knob.
   const columns = [
     { key: 'timestamp', label: 'Time',    width: '160px', class: 'pkt-c-time',           render: timeCell    },
-    { key: 'type',      label: 'Type',    width: '100px', class: 'pkt-c-type',           render: typeCell    },
+    { key: 'type',      label: 'Type',    width: '190px', class: 'pkt-c-type',           render: typeCell    },
     { key: 'srcdst',    label: 'Src→Dst', width: 'minmax(220px, 1.5fr)', class: 'pkt-c-srcdst',         render: srcDstCell  },
     { key: 'metadata',  label: 'Details', width: 'minmax(360px, 1fr)', class: 'pkt-c-metadata', render: metadataCell },
   ];
@@ -367,6 +367,7 @@
   }
 
   .pkt-badge {
+    flex-shrink: 0;
     display: inline-block;
     font-weight: 700;
     font-size: 10px;
@@ -382,16 +383,14 @@
     font-weight: 500;
   }
 
-  /* Lay the Type + Origin badges side-by-side in a single row so every
-     row stays the same height. The cell is sized wide enough that neither
-     badge needs to wrap in practice; nowrap prevents wrapping even when
-     content edges out (rare). */
+  /* Keep complete badges visible, wrapping between them if needed. */
   .pkt-type-stack {
     display: inline-flex;
     flex-direction: row;
     align-items: center;
     gap: 4px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+    max-width: 100%;
   }
 
   .pkt-b-origin {

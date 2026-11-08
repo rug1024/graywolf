@@ -43,6 +43,8 @@ message PlatformMessage {
     BleScanStop ble_scan_stop = 30;
     BleRepairRequest ble_repair_request = 31;
     BleRepairAck ble_repair_ack = 32;
+    BleHistoryRequest ble_history_request = 33;
+    BleHistoryResponse ble_history_response = 34;
   }
 }
 
@@ -293,4 +295,17 @@ message BleRepairRequest {
 message BleRepairAck {
   bool   ok    = 1;
   string error = 2;
+}
+
+// History is a separate authenticated GATT operation, never SerialData.
+message BleHistoryRequest {
+  uint32 request_id = 1;
+  uint32 handle = 2;
+  bytes cursor = 3;
+}
+message BleHistoryResponse {
+  uint32 request_id = 1;
+  bytes record = 2;
+  bool unsupported = 3;
+  bool failed = 4;
 }
