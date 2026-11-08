@@ -27,3 +27,5 @@ number. Re-importing a mailbox record is deduplicated. An RF retry delivered
 live after reconnect can still appear separately.
 
 Record the Android build ID and tracker firmware revision before testing.
+
+Test hardware: T-Beam 1W.
