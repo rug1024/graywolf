@@ -758,7 +758,7 @@
     color: var(--color-text-muted, var(--text-muted));
   }
   .hint code {
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-sans);
     background: var(--accent-bg, rgba(0, 0, 0, 0.05));
     padding: 1px 4px;
     border-radius: 3px;
@@ -819,7 +819,7 @@
     margin-top: 12px;
   }
   .exec-help-body code {
-    font-family: 'SauceCodePro Nerd Font', ui-monospace, monospace;
+    font-family: var(--font-sans);
     background: var(--accent-bg, rgba(0, 0, 0, 0.05));
     color: var(--text-primary);
     padding: 1px 4px;
@@ -831,7 +831,7 @@
     padding: 8px 10px;
     background: var(--bg-secondary, rgba(0, 0, 0, 0.05));
     border-radius: 3px;
-    font-family: 'SauceCodePro Nerd Font', ui-monospace, monospace;
+    font-family: var(--font-sans);
     font-size: 11.5px;
     color: var(--text-primary);
     white-space: pre-wrap;
@@ -878,7 +878,7 @@
     resize: vertical;
   }
   .textarea.code {
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-sans);
     font-size: 12px;
   }
   .radio-row {

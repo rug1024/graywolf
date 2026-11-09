@@ -16,15 +16,15 @@ function invalid(v) {
 }
 
 // Distance — input is statute miles
-export function formatDistance(miles) {
+export function formatDistance(miles, fractionDigits = 1) {
   if (invalid(miles)) return EM_DASH;
   if (unitsState.isMetric) {
     const km = miles * KM_PER_MI;
     if (km < 1) return `${(km * 1000).toFixed(0)} m`;
-    return `${km.toFixed(1)} km`;
+    return `${km.toFixed(fractionDigits)} km`;
   }
   if (miles < 0.1) return `${(miles * FT_PER_MI).toFixed(0)} ft`;
-  return `${miles.toFixed(1)} mi`;
+  return `${miles.toFixed(fractionDigits)} mi`;
 }
 
 // Altitude — input is meters

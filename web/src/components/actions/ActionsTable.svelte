@@ -168,7 +168,7 @@
     border-radius: 10px;
     padding: 1px 8px;
     font-size: 12px;
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-sans);
   }
   .chip.overflow {
     cursor: help;

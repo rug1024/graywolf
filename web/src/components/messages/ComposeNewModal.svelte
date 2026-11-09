@@ -12,17 +12,20 @@
   import { Icon, Modal, Select } from '@chrissnell/chonky-ui';
   import CallsignAutocomplete from './CallsignAutocomplete.svelte';
   import ComposeBar from './ComposeBar.svelte';
+  import RFPathPicker from './RFPathPicker.svelte';
   import { channelsStore, start as startChannels } from '../../lib/stores/channels.svelte.js';
 
   /** @type {{
    *    open: boolean,
    *    onSend?: (text: string, to: string, channel: number) => Promise<any>,
    *    onClose?: () => void,
+   *    onPrepare?: (to: string, options: any) => Promise<any>,
    *  }}
    */
   let {
     open = $bindable(false),
     onSend,
+    onPrepare,
     onClose,
   } = $props();
 
@@ -32,17 +35,26 @@
   // collapsed by default so the normal compose flow stays uncluttered.
   let channel = $state(0);
   let advancedOpen = $state(false);
+  let sendPath = $state('__keep');
+  let rfPath = $state(null);
+  let pathChanged = $state(false);
+  let pathValid = $state(true);
+  const sendPathOptions = [
+    { value: '__keep', label: 'Keep conversation / default' },
+    { value: '', label: 'Use global default' },
+    { value: 'rf_only', label: 'RF only' },
+    { value: 'is_only', label: 'APRS-IS only' },
+    { value: 'both', label: 'RF + APRS-IS' },
+  ];
 
-  // Reset the override when a fresh compose session opens rather than on
-  // close(). A long message is split into several parts and ComposeBar
-  // awaits onSend() once per part; each of those calls close(). Resetting
-  // in close() would zero the channel after part 1, silently sending the
-  // remaining parts on the default channel. Keying the reset off the
-  // open→true transition keeps the choice stable for the whole batch.
+  // Keep options stable for the complete batch; reset for a new session.
   let wasOpen = false;
   $effect(() => {
     if (open && !wasOpen) {
       channel = 0;
+      sendPath = '__keep';
+      rfPath = null;
+      pathChanged = false;
       advancedOpen = false;
     }
     wasOpen = open;
@@ -65,17 +77,22 @@
 
   function close() {
     open = false;
-    // The override is reset on the next open (see the effect above), not
-    // here — close() fires once per part of a multi-part send.
+    // Called once after the complete batch succeeds.
     onClose?.();
   }
 
-  async function send(text, targetOverride) {
-    const target = (targetOverride || to || '').trim().toUpperCase();
-    if (!target) return;
-    await onSend?.(text, target, channel);
-    close();
+  async function prepare(target) {
+    // Snapshot options before awaiting any request. All fragments then use
+    // the same persisted conversation policy, including the first one.
+    await onPrepare?.(target, {
+      sendPath: sendPath === '__keep' ? null : sendPath,
+      rfPath, pathChanged,
+    });
   }
+  async function send(text, target, batchChannel) {
+    await onSend?.(text, target.trim().toUpperCase(), batchChannel);
+  }
+
 </script>
 
 <Modal bind:open onClose={close}>
@@ -105,7 +122,11 @@
       threadHasMessages={false}
       autoFocus={false}
       embedded={true}
-      onSend={(text) => send(text)}
+      {channel}
+      sendDisabled={!pathValid}
+      beforeSend={prepare}
+      onSend={send}
+      onSent={close}
     />
     <!-- Advanced (collapsed by default). Per-station channel selection
          for operators running multiple radios on one instance. -->
@@ -123,10 +144,13 @@
           aria-label="Message transmit channel"
         />
         <p class="advanced-hint">
-          Sends this message on a specific radio channel instead of your
-          configured default. Useful when multiple radios on different
-          bands share this station.
+          Radio / interface used for RF transmission.
         </p>
+        <span class="advanced-label">Send path (transport)</span>
+        <Select value={sendPath} onValueChange={v => sendPath = String(v)} options={sendPathOptions} aria-label="Message send transport" />
+        <p class="advanced-hint">How to send: RF = radio; APRS-IS = Internet. Automatic tries RF first, then Internet if RF is unavailable.</p>
+        <RFPathPicker value={rfPath} bind:valid={pathValid} onChange={v => { rfPath = v; pathChanged = true; }} />
+        <p class="advanced-hint">“RF only” selects radio transport. “RFONLY” in the packet path asks receiving iGates not to upload it. Choices apply to this conversation.</p>
       </div>
     </details>
   </Modal.Body>

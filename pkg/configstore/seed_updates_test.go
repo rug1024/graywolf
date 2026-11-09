@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// TestGetUpdatesConfig_DefaultsToEnabledWhenMissing asserts the
-// defaults-to-on contract: on a fresh install with no row, GetUpdatesConfig
-// returns Enabled=true (not the Go zero value) so the feature is on
+// TestGetUpdatesConfig_DefaultsToDisabledWhenMissing asserts the
+// defaults-to-off contract: on a fresh install with no row, GetUpdatesConfig
+// returns Enabled=false (the Go zero value) so the feature is off
 // out of the box without a separate seed step.
 func TestGetUpdatesConfig_DefaultsToEnabledWhenMissing(t *testing.T) {
 	ctx := context.Background()
@@ -20,8 +20,8 @@ func TestGetUpdatesConfig_DefaultsToEnabledWhenMissing(t *testing.T) {
 	if got.ID != 0 {
 		t.Fatalf("expected no row (ID=0), got %+v", got)
 	}
-	if !got.Enabled {
-		t.Fatalf("expected Enabled=true on fresh install, got %+v", got)
+	if got.Enabled {
+		t.Fatalf("expected Enabled=false on fresh install, got %+v", got)
 	}
 }
 

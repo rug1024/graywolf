@@ -42,6 +42,7 @@
    *    value?: string,
    *    placeholder?: string,
    *    onCommit?: (call: string) => void,
+   *    onValueChange?: (call: string) => void,
    *    disabled?: boolean,
    *    autofocus?: boolean,
    *    excludeBots?: boolean,
@@ -51,6 +52,7 @@
     value = $bindable(''),
     placeholder = 'Callsign, tactical, or APRS service',
     onCommit,
+    onValueChange,
     disabled = false,
     autofocus = false,
     excludeBots = false,
@@ -117,6 +119,7 @@
   function onInput(e) {
     const raw = e.target.value || '';
     value = raw.toUpperCase();
+    onValueChange?.(value);
     // Keep the DOM input in sync with the normalized value.
     if (e.target.value !== value) e.target.value = value;
     open = true;

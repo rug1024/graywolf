@@ -158,7 +158,7 @@
   <Button onclick={exportCsv}>Export CSV</Button>
 </PageHeader>
 
-<Box>
+<div class="log-filters"><Box>
   <div class="filter-bar">
     <div class="filter-input">
       <Input bind:value={filter} placeholder="Search callsign, destination, raw..." />
@@ -175,9 +175,9 @@
       ]} />
     </div>
   </div>
-</Box>
+</Box></div>
 
-<div style="margin-top: 12px;">
+<div style="margin-top: 8px;">
   {#if offline}
     <Box><div class="empty">No log entries — connection to the Graywolf server lost.</div></Box>
   {:else if loading}
@@ -202,6 +202,7 @@
 </div>
 
 <style>
+  .log-filters :global(.box-body) { padding: 10px 12px; }
   .conn-status {
     display: inline-flex;
     align-items: center;

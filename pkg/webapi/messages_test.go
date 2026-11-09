@@ -1363,3 +1363,43 @@ func TestMessagesRoutes_Registered(t *testing.T) {
 // Sanity — gorm.ErrRecordNotFound is re-exported so the checker's
 // import survives a refactor.
 var _ = gorm.ErrRecordNotFound
+
+func TestConversationRFPacketPathRoundTripAndValidation(t *testing.T) {
+	_, mux, _ := newMessagesTestServer(t, &fakeMessagesSvc{})
+	endpoint := "/api/messages/conversations/dm/W1ABC/prefs"
+	for _, tc := range []struct {
+		body string
+		want *string
+	}{
+		{`{"send_path":"rf_only","wait_for_ack":false,"rf_path":" db0abc-2 , nogate "}`, func() *string { s := "DB0ABC-2,NOGATE"; return &s }()},
+		{`{"send_path":"","wait_for_ack":true,"rf_path":""}`, func() *string { s := ""; return &s }()},
+		{`{"send_path":"","wait_for_ack":true,"rf_path":null}`, nil},
+	} {
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, endpoint, strings.NewReader(tc.body)))
+		if rec.Code != http.StatusOK {
+			t.Fatalf("PUT: %d %s", rec.Code, rec.Body.String())
+		}
+		read := httptest.NewRecorder()
+		mux.ServeHTTP(read, httptest.NewRequest(http.MethodGet, endpoint, nil))
+		var got dto.ConversationPrefsResponse
+		if err := json.Unmarshal(read.Body.Bytes(), &got); err != nil {
+			t.Fatal(err)
+		}
+		if tc.want == nil {
+			if got.RFPath != nil {
+				t.Fatalf("want inherited path, got %q", *got.RFPath)
+			}
+		} else if got.RFPath == nil || *got.RFPath != *tc.want {
+			t.Fatalf("path round-trip failed: %+v", got)
+		}
+	}
+	for _, path := range []string{"TCPIP", "WIDE2-1*", "DB0ABC-16", "WIDE2-1,"} {
+		body, _ := json.Marshal(map[string]any{"send_path": "rf_only", "wait_for_ack": true, "rf_path": path})
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPut, endpoint, strings.NewReader(string(body))))
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("accepted invalid path %q: %d %s", path, rec.Code, rec.Body.String())
+		}
+	}
+}

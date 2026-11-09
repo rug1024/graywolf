@@ -80,7 +80,8 @@ Each of `danger`, `success`, `warning`, `info` has a trio:
 - `--color-btn-border` — button border.
 
 ### Typography / shape (optional)
-- `--font-mono` — monospaced stack. Leave alone unless you have reason.
+- `--font-sans` — bundled Inter, shared by all mod palettes.
+- `--font-mono` — legacy UI token, aliased to `--font-sans` in this mod.
 - `--radius` — corner radius in px. Most shipped themes use 2px;
   Graywolf Night bumps it to 6px for a softer feel at low contrast.
 

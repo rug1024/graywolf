@@ -1,0 +1,48 @@
+Graywolf Mod __VERSION__ - Installation / Update
+
+Raspberry Pi mit 64-Bit-Linux
+----------------------------
+Das Paket graywolf-mod-linux-arm64-go-rust.zip herunterladen und unter
+/tmp/graywolf-mod-linux-arm64-go-rust.zip auf dem Pi ablegen.
+Die folgenden Befehle gemeinsam in die Shell kopieren. Der Block bricht
+bei einem Fehler ab. Die Sicherung trennt Programme und Daten bewusst,
+damit die Datei graywolf und das Datenverzeichnis graywolf nicht kollidieren.
+
+(
+set -e
+
+update_dir=$(mktemp -d /tmp/graywolf-update.XXXXXX)
+unzip /tmp/graywolf-mod-linux-arm64-go-rust.zip -d "$update_dir"
+cd "$update_dir"
+sha256sum -c sha256.txt
+
+sudo systemctl stop graywolf.service
+backup="/var/backups/graywolf-$(date +%Y%m%d-%H%M%S)"
+sudo mkdir -p "$backup/bin" "$backup/data"
+sudo cp -a /usr/bin/graywolf /usr/bin/graywolf-modem "$backup/bin/"
+sudo cp -a /var/lib/graywolf "$backup/data/"
+echo "Sicherung: $backup"
+
+sudo install -m 0755 graywolf /usr/bin/graywolf
+sudo install -m 0755 graywolf-modem /usr/bin/graywolf-modem
+sudo systemctl start graywolf.service
+
+/usr/bin/graywolf version
+/usr/bin/graywolf-modem --version
+systemctl status graywolf.service --no-pager -l
+)
+
+Erwartete Version beider Programme: __VERSION__
+Anschliessend die Weboberflaeche mit Strg+F5 neu laden.
+Bei Startproblemen: sudo journalctl -u graywolf.service -n 80 --no-pager
+
+Android
+-------
+Das Paket graywolf-mod-__COMMIT__-compatible-update.zip entpacken.
+Die enthaltene graywolf-mod-__COMMIT__-update.apk als Update installieren.
+Die vorhandene App NICHT deinstallieren: Einstellungen und Nachrichten
+sollen erhalten bleiben. Die Update-APK wird mit dem bisherigen Schluessel
+signiert; der Build prueft den SHA-256-Fingerabdruck des Zertifikats:
+5e8aef2ea71a52a84e723974317c6af39549fb9167d6ff8639cb23d7eae299eb
+
+Das rohe Zwischenartefakt graywolf-debug-apk ist nicht das Update-Paket.

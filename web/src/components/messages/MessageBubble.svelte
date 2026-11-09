@@ -41,6 +41,8 @@
     hasAutoNavFired,
   } from '../../lib/stores/ignoredInvites.js';
   import { timeOfDay } from './time.js';
+  import { receiveRouteLabel } from './receive-route.js';
+  import { channelsStore } from '../../lib/stores/channels.svelte.js';
 
   /** @type {{
    *    msg: any,
@@ -84,6 +86,8 @@
 
   const status = $derived(msg?.status || '');
   const source = $derived(msg?.source || '');
+  const fromTracker = $derived(source === 'hist');
+  const receiveRoute = $derived(receiveRouteLabel(msg, channelsStore.list));
 
   const statusInfo = $derived.by(() => {
     // Tactical outgoing gets the broadcast visual regardless of
@@ -135,7 +139,7 @@
   }
 
   const sourceBadge = $derived.by(() => {
-    if (!source) return null;
+    if (!source || fromTracker) return null;
     if (source === 'rf') return { variant: 'success', label: 'RF' };
     if (source === 'is') return { variant: 'info', label: 'IS' };
     if (source === 'sim') return { variant: 'warning', label: 'Sim' };
@@ -320,7 +324,7 @@
       data-testid="bubble-meta-open"
       title="View details"
     >
-      <span class="ts">{timeOfDay(msg?.sent_at || msg?.received_at || msg?.created_at)}</span>
+      <span class="ts">{fromTracker && !msg?.received_at ? '—' : timeOfDay(msg?.sent_at || msg?.received_at || msg?.created_at)}</span>
     </button>
     {#if sourceBadge}
       <Badge variant={sourceBadge.variant} class="src-badge">{sourceBadge.label}</Badge>
@@ -405,6 +409,7 @@
     <div
       bind:this={bubbleEl}
       class="bubble"
+      class:tracker-history={fromTracker}
       class:has-stripe={isTactical && !isOut}
       class:action-reply={actionReply && !isOut}
       style={isTactical && !isOut ? `--stripe-color:${colors.stripe}` : undefined}
@@ -415,6 +420,9 @@
       onpointerup={onPointerUpOrCancel}
       onpointercancel={onPointerUpOrCancel}
     >
+      {#if fromTracker}
+        <div class="tracker-label">Vom Tracker{msg?.received_at ? '' : ' · Empfangszeit unbekannt'}</div>
+      {/if}
       {#if isInvite}
       {#if isThisIgnored}
         <p class="bubble-text invite-dismissed" data-testid="invite-dismissed">
@@ -524,6 +532,9 @@
       {/if}
     {/if}
     </div>
+    {#if receiveRoute}
+      <div class="receive-route" data-testid="message-receive-route">{receiveRoute}</div>
+    {/if}
   </div>
 
   {#if showReplyPrivately}
@@ -540,6 +551,16 @@
 </article>
 
 <style>
+  .receive-route {
+    margin: 3px 4px 0;
+    max-width: 100%;
+    font-family: var(--font-sans);
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
   .bubble-wrap {
     display: flex;
     flex-direction: row;
@@ -612,6 +633,14 @@
        without depending on the page background. */
     box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
     user-select: none;
+  }
+
+  .bubble.tracker-history {
+    outline: 1px solid var(--color-info, #4588db);
+  }
+  .tracker-label {
+    color: var(--color-info, #4588db);
+    font-size: 0.75rem;
   }
 
   .bubble {

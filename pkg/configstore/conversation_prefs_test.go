@@ -94,3 +94,23 @@ func TestConversationPrefs_UpsertDefaultsDeletesRow(t *testing.T) {
 		t.Fatalf("reset of missing row should be a no-op: %v", err)
 	}
 }
+
+func TestConversationPrefsExplicitDirectPathIsNotDeletedAsDefault(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	direct := ""
+	if err := s.UpsertConversationPrefs(ctx, &ConversationPrefs{ThreadKind: "dm", ThreadKey: "W1ABC", WaitForAck: true, RFPath: &direct}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := s.GetConversationPrefs(ctx, "dm", "W1ABC")
+	if err != nil || got == nil || got.RFPath == nil || *got.RFPath != "" {
+		t.Fatalf("lost explicit direct path: %+v, %v", got, err)
+	}
+	if err := s.UpsertConversationPrefs(ctx, &ConversationPrefs{ThreadKind: "dm", ThreadKey: "W1ABC", WaitForAck: true}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = s.GetConversationPrefs(ctx, "dm", "W1ABC")
+	if err != nil || got != nil {
+		t.Fatalf("reset did not clear override: %+v, %v", got, err)
+	}
+}

@@ -12,8 +12,8 @@ import (
 )
 
 // Fresh DB has no UnitsConfig row yet. GET returns 200 with
-// system="imperial" per the singleton-on-missing contract.
-func TestGetUnitsConfig_DefaultImperial(t *testing.T) {
+// system="metric" per the singleton-on-missing contract.
+func TestGetUnitsConfig_DefaultMetric(t *testing.T) {
 	srv, _ := newTestServer(t)
 	mux := http.NewServeMux()
 	srv.RegisterRoutes(mux)
@@ -29,8 +29,8 @@ func TestGetUnitsConfig_DefaultImperial(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
 		t.Fatal(err)
 	}
-	if resp.System != "imperial" {
-		t.Errorf("System = %q, want %q (default)", resp.System, "imperial")
+	if resp.System != "metric" {
+		t.Errorf("System = %q, want %q (default)", resp.System, "metric")
 	}
 }
 

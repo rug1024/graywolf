@@ -936,7 +936,7 @@
     color: var(--color-text-muted, var(--text-secondary, #888));
   }
   .callsign-mode-value {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: var(--font-sans);
     font-weight: 600;
     color: var(--text-primary);
   }
@@ -1004,7 +1004,7 @@
     background: var(--color-danger-muted, rgba(248, 81, 73, 0.15));
   }
   .rule-channel-name {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: var(--font-sans);
     font-size: 12px;
     color: var(--text-primary);
     overflow: hidden;

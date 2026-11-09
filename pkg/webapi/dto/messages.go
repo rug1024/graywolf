@@ -16,17 +16,17 @@ import (
 // configstore.Message columns — see MessageResponse.Status below for
 // the derivation table.
 const (
-	MessageStatusQueued       = "queued"        // outbound, not yet submitted
-	MessageStatusTxSubmitted  = "tx_submitted"  // outbound, submitted but not yet TxHook-confirmed
-	MessageStatusSentRF       = "sent_rf"       // outbound DM, RF sent, awaiting ack
-	MessageStatusSentIS       = "sent_is"       // outbound DM, IS sent, awaiting ack
-	MessageStatusAwaitingAck  = "awaiting_ack"  // outbound DM, sent but not yet acked
-	MessageStatusAcked        = "acked"         // outbound DM, acked
-	MessageStatusRejected     = "rejected"      // outbound DM, REJ received
-	MessageStatusTimeout      = "timeout"       // outbound DM, retry budget exhausted
-	MessageStatusBroadcast    = "sent"          // tactical outbound broadcast — terminal
-	MessageStatusFailed       = "failed"        // terminal failure (non-retryable)
-	MessageStatusReceived     = "received"      // inbound
+	MessageStatusQueued      = "queued"       // outbound, not yet submitted
+	MessageStatusTxSubmitted = "tx_submitted" // outbound, submitted but not yet TxHook-confirmed
+	MessageStatusSentRF      = "sent_rf"      // outbound DM, RF sent, awaiting ack
+	MessageStatusSentIS      = "sent_is"      // outbound DM, IS sent, awaiting ack
+	MessageStatusAwaitingAck = "awaiting_ack" // outbound DM, sent but not yet acked
+	MessageStatusAcked       = "acked"        // outbound DM, acked
+	MessageStatusRejected    = "rejected"     // outbound DM, REJ received
+	MessageStatusTimeout     = "timeout"      // outbound DM, retry budget exhausted
+	MessageStatusBroadcast   = "sent"         // tactical outbound broadcast — terminal
+	MessageStatusFailed      = "failed"       // terminal failure (non-retryable)
+	MessageStatusReceived    = "received"     // inbound
 )
 
 // DeriveMessageStatus maps the row's persisted column tuple to the
@@ -36,11 +36,14 @@ const (
 //
 // Direction = "in"   → "received"
 // Direction = "out" && ThreadKind = "tactical":
+//
 //	AckState == "broadcast"           → "sent"   (per plan: tactical terminal maps to "sent")
 //	SentAt == nil && Attempts == 0    → "queued"
 //	SentAt == nil && Attempts > 0     → "tx_submitted"
 //	default                            → "sent"
+//
 // Direction = "out" && ThreadKind = "dm":
+//
 //	AckState == "acked"                                          → "acked"
 //	AckState == "rejected" && FailureReason != ""                → "timeout" or "failed"
 //	AckState == "rejected"                                       → "rejected"
@@ -206,8 +209,8 @@ func (r SendMessageRequest) Validate() error {
 // underlying columns.
 type MessageResponse struct {
 	ID             uint64     `json:"id"`
-	Direction      string     `json:"direction"`                // "in" | "out"
-	Status         string     `json:"status"`                   // derived — see DeriveMessageStatus
+	Direction      string     `json:"direction"` // "in" | "out"
+	Status         string     `json:"status"`    // derived — see DeriveMessageStatus
 	OurCall        string     `json:"our_call"`
 	PeerCall       string     `json:"peer_call"`
 	FromCall       string     `json:"from_call"`
@@ -218,7 +221,7 @@ type MessageResponse struct {
 	ReceivedAt     *time.Time `json:"received_at,omitempty"`
 	SentAt         *time.Time `json:"sent_at,omitempty"`
 	AckedAt        *time.Time `json:"acked_at,omitempty"`
-	Source         string     `json:"source,omitempty"`          // "rf" | "is"
+	Source         string     `json:"source,omitempty"` // "rf" | "is"
 	Channel        *uint32    `json:"channel,omitempty"`
 	Path           string     `json:"path,omitempty"`
 	Via            string     `json:"via,omitempty"`
@@ -257,28 +260,28 @@ type MessageResponse struct {
 // semantic "channel 0" that would confuse clients.
 func MessageFromModel(m configstore.Message) MessageResponse {
 	resp := MessageResponse{
-		ID:             m.ID,
-		Direction:      m.Direction,
-		Status:         DeriveMessageStatus(m),
-		OurCall:        m.OurCall,
-		PeerCall:       m.PeerCall,
-		FromCall:       m.FromCall,
-		ToCall:         m.ToCall,
-		Text:           m.Text,
-		MsgID:          m.MsgID,
-		CreatedAt:      m.CreatedAt.UTC(),
-		ReceivedAt:     nilUTC(m.ReceivedAt),
-		SentAt:         nilUTC(m.SentAt),
-		AckedAt:        nilUTC(m.AckedAt),
-		Source:         m.Source,
-		Path:           m.Path,
-		Via:            m.Via,
-		Unread:         m.Unread,
-		Attempts:       m.Attempts,
-		NextRetryAt:    nilUTC(m.NextRetryAt),
-		FailureReason:  m.FailureReason,
-		IsAck:          m.IsAck,
-		IsBulletin:     m.IsBulletin,
+		ID:               m.ID,
+		Direction:        m.Direction,
+		Status:           DeriveMessageStatus(m),
+		OurCall:          m.OurCall,
+		PeerCall:         m.PeerCall,
+		FromCall:         m.FromCall,
+		ToCall:           m.ToCall,
+		Text:             m.Text,
+		MsgID:            m.MsgID,
+		CreatedAt:        m.CreatedAt.UTC(),
+		ReceivedAt:       nilUTC(m.ReceivedAt),
+		SentAt:           nilUTC(m.SentAt),
+		AckedAt:          nilUTC(m.AckedAt),
+		Source:           m.Source,
+		Path:             m.Path,
+		Via:              m.Via,
+		Unread:           m.Unread,
+		Attempts:         m.Attempts,
+		NextRetryAt:      nilUTC(m.NextRetryAt),
+		FailureReason:    m.FailureReason,
+		IsAck:            m.IsAck,
+		IsBulletin:       m.IsBulletin,
 		ThreadKind:       m.ThreadKind,
 		ThreadKey:        m.ThreadKey,
 		ReceivedByCall:   m.ReceivedByCall,
@@ -490,6 +493,9 @@ func MessagePreferencesFromModel(m configstore.MessagePreferences) MessagePrefer
 // popover); the server deletes the row when they equal the defaults so
 // the table stays sparse.
 type ConversationPrefsRequest struct {
+	// RFPath overrides the RF packet path for this conversation. Nil
+	// inherits the operator default; an empty string means direct.
+	RFPath *string `json:"rf_path,omitempty"`
 	// SendPath overrides transport for this conversation. Empty ('')
 	// means "inherit the global fallback policy"; otherwise one of
 	// rf_only | is_only | both.
@@ -501,9 +507,14 @@ type ConversationPrefsRequest struct {
 }
 
 // Validate constrains SendPath to the inherit-or-enum set. is_fallback
-// is rejected as an override: it is identical to inherit ('') and
+// is rejected as an override: it is identical to inherit (”) and
 // accepting both would give two encodings for the same behavior.
 func (r ConversationPrefsRequest) Validate() error {
+	if r.RFPath != nil {
+		if err := messages.ValidateRFPacketPath(*r.RFPath); err != nil {
+			return err
+		}
+	}
 	switch r.SendPath {
 	case "",
 		messages.FallbackPolicyRFOnly,
@@ -518,7 +529,17 @@ func (r ConversationPrefsRequest) Validate() error {
 // ToModel builds a configstore row for (kind, key). Key is uppercased
 // so lookups at send time (which also uppercase) hit the same row.
 func (r ConversationPrefsRequest) ToModel(kind, key string) configstore.ConversationPrefs {
+	var rfPath *string
+	if r.RFPath != nil {
+		parts := strings.Split(strings.ToUpper(*r.RFPath), ",")
+		for i := range parts {
+			parts[i] = strings.TrimSpace(parts[i])
+		}
+		path := strings.Join(parts, ",")
+		rfPath = &path
+	}
 	return configstore.ConversationPrefs{
+		RFPath:     rfPath,
 		ThreadKind: strings.ToLower(strings.TrimSpace(kind)),
 		ThreadKey:  strings.ToUpper(strings.TrimSpace(key)),
 		SendPath:   r.SendPath,
@@ -531,10 +552,11 @@ func (r ConversationPrefsRequest) ToModel(kind, key string) configstore.Conversa
 // (inherit + wait_for_ack true) rather than 404 so the client can
 // render the Routing control without a special-case.
 type ConversationPrefsResponse struct {
-	ThreadKind string `json:"thread_kind"`
-	ThreadKey  string `json:"thread_key"`
-	SendPath   string `json:"send_path"`
-	WaitForAck bool   `json:"wait_for_ack"`
+	RFPath     *string `json:"rf_path,omitempty"`
+	ThreadKind string  `json:"thread_kind"`
+	ThreadKey  string  `json:"thread_key"`
+	SendPath   string  `json:"send_path"`
+	WaitForAck bool    `json:"wait_for_ack"`
 }
 
 // ConversationPrefsDefaults returns the response a thread with no stored
@@ -551,6 +573,7 @@ func ConversationPrefsDefaults(kind, key string) ConversationPrefsResponse {
 // ConversationPrefsFromModel renders a stored row.
 func ConversationPrefsFromModel(m configstore.ConversationPrefs) ConversationPrefsResponse {
 	return ConversationPrefsResponse{
+		RFPath:     m.RFPath,
 		ThreadKind: m.ThreadKind,
 		ThreadKey:  m.ThreadKey,
 		SendPath:   m.SendPath,

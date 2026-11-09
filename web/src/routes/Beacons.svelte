@@ -1338,7 +1338,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: ui-monospace, SFMono-Regular, monospace;
+    font-family: var(--font-sans);
     font-size: 12px;
     font-weight: 700;
     line-height: 1;

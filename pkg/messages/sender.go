@@ -574,10 +574,13 @@ func (s *Sender) buildFrame(row *configstore.Message) (*ax25.Frame, error) {
 	if err != nil {
 		return nil, fmt.Errorf("messages: dest: %w", err)
 	}
-	// Digipeater path: the row does not persist a path; outbound
-	// uses the preferences DefaultPath. Parse once per send — the
-	// path rarely changes and this keeps the sender stateless.
-	path, err := parsePath(s.cfg.Preferences.Current().DefaultPath)
+	// Explicit conversation paths are snapshotted so retries keep the
+	// original RFONLY/NOGATE policy, even if preferences change later.
+	packetPath := s.cfg.Preferences.Current().DefaultPath
+	if row.RFPath != nil {
+		packetPath = *row.RFPath
+	}
+	path, err := parsePath(packetPath)
 	if err != nil {
 		return nil, fmt.Errorf("messages: path: %w", err)
 	}

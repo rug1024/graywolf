@@ -96,7 +96,7 @@
     padding: 0 4px 0 8px;
     background: var(--surface-2, rgba(0, 0, 0, 0.06));
     border-radius: 999px;
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-sans);
     font-size: 12px;
   }
   .chip-call {

@@ -98,7 +98,7 @@ func (s *Store) UpsertConversationPrefs(ctx context.Context, cfg *ConversationPr
 	if err != nil {
 		return err
 	}
-	if cfg.SendPath == "" && cfg.WaitForAck {
+	if cfg.SendPath == "" && cfg.WaitForAck && cfg.RFPath == nil {
 		if existing != nil {
 			return s.db.WithContext(ctx).Delete(&ConversationPrefs{}, existing.ID).Error
 		}

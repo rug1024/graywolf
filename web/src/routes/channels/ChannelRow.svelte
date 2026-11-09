@@ -377,7 +377,7 @@
     height: 12px;
     line-height: 1;
     font-size: 12px;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-family: var(--font-sans);
   }
   .glyph.live {
     color: var(--color-success, #2ea043);

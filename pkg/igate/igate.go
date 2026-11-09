@@ -109,6 +109,8 @@ type Config struct {
 	// ServerFilter is the APRS-IS filter string passed at login time
 	// (e.g. "m/100" for a 100km radius around the station).
 	ServerFilter string
+	// RFToISBlocklist is a user-defined source denylist (base calls or specific SSIDs).
+	RFToISBlocklist string
 	// SoftwareName and SoftwareVersion appear in the login banner.
 	SoftwareName    string
 	SoftwareVersion string
@@ -171,6 +173,9 @@ type Config struct {
 
 // Status is the current state exposed via the REST endpoint.
 type Status struct {
+	RFToISEnabled  bool      `json:"rf_to_is_enabled"`
+	TxChannel      uint32    `json:"tx_channel"`
+	IsToRFEnabled  bool      `json:"is_to_rf_enabled"`
 	Connected      bool      `json:"connected"`
 	Server         string    `json:"server"`
 	Callsign       string    `json:"callsign"`
@@ -196,12 +201,16 @@ type Igate struct {
 	stationCallsign string
 
 	filter atomic.Pointer[filters.Engine]
-	heard  *heardDirect
+	// Read without locks on RF receive; updated on live iGate reconfiguration.
+	rfToISBlocklist atomic.Pointer[rfToISBlocklist]
+	heard           *heardDirect
 
 	mu            sync.Mutex
 	connected     bool
 	lastConnected time.Time
 	simulation    atomic.Bool
+	// Controls both RF receive uploads and KISS-client RF→IS TX gating.
+	rfToIsEnabled atomic.Bool
 
 	// txChannel mirrors cfg.TxChannel but is mutable at runtime via
 	// SetTxChannel so an iGate-config save can retarget IS→RF without
@@ -289,8 +298,11 @@ func New(cfg Config) (*Igate, error) {
 		done:            make(chan struct{}),
 	}
 	ig.filter.Store(filters.New(cfg.Rules))
+	ig.rfToISBlocklist.Store(newRFToISBlocklist(cfg.RFToISBlocklist))
 	ig.sessCtx.Store(&sessCtxHolder{ctx: context.Background()})
 	ig.simulation.Store(cfg.SimulationMode)
+	// Keep the existing direct-usage default; App wiring loads the saved switch.
+	ig.rfToIsEnabled.Store(true)
 	ig.txChannel.Store(cfg.TxChannel)
 	// Parse the IS→RF via-path once at construction. A malformed value
 	// (validated at save time, so normally unreachable) falls back to
@@ -478,6 +490,11 @@ func (ig *Igate) handleISLine(line string) {
 	frame, err := parseTNC2(line)
 	if err != nil {
 		ig.logger.Debug("aprs-is tnc2 parse failed", "err", err, "line", line)
+		return
+	}
+	// Drop DAPNET before the packet-log hook, station cache, messages
+	// router, IS→RF governor and all other local IS consumers.
+	if aprs.IsDAPNETFrame(frame) {
 		return
 	}
 	// Decode just enough to evaluate rules (filter engine reads
@@ -706,6 +723,9 @@ type GateReason string
 
 const (
 	GateReasonNilPacket   GateReason = "nil-packet"
+	GateReasonDisabled    GateReason = "rf-to-is-disabled"
+	GateReasonDAPNET      GateReason = "dapnet-pocsag-blocked"
+	GateReasonSourceBlock GateReason = "rf-to-is-source-blocked"
 	GateReasonThirdParty  GateReason = "third-party"
 	GateReasonPathBlocks  GateReason = "path-blocks"
 	GateReasonSelfMessage GateReason = "self-message"
@@ -724,6 +744,17 @@ func (ig *Igate) gateRFToIS(pkt *aprs.DecodedAPRSPacket) GateReason {
 	if pkt == nil {
 		return GateReasonNilPacket
 	}
+	// User-configured RF→IS source exclusions are independent of the
+	// APRS-IS receive filter; keep excluded sources out of the local
+	// heard-direct tracker as well.
+	if ig.rfToISBlocklist.Load().blocks(pkt.Source) {
+		return GateReasonSourceBlock
+	}
+	// Defence in depth: this path also receives KISS-client transmissions,
+	// not only frames handled by the RF receive fanout.
+	if frame, err := ax25.Decode(pkt.Raw); err == nil && aprs.IsDAPNETFrame(frame) {
+		return GateReasonDAPNET
+	}
 	// Record every direct-RF arrival in the heard-direct tracker so
 	// the IS->RF gate knows which stations are in range for
 	// message-delivery. We do this BEFORE any drop checks because
@@ -732,6 +763,11 @@ func (ig *Igate) gateRFToIS(pkt *aprs.DecodedAPRSPacket) GateReason {
 	// frame yet (no '*' marker in the path).
 	if pkt.Source != "" && pathIsDirect(pkt.Path) {
 		ig.heard.Record(pkt.Source)
+	}
+	// The live operator switch applies to both KISS TX and RF receive
+	// uplinks; continue listening and receiving even while disabled.
+	if !ig.rfToIsEnabled.Load() {
+		return GateReasonDisabled
 	}
 	// Rule: never gate third-party traffic (already came from the net).
 	if pkt.ThirdParty != nil || pkt.Type == aprs.PacketThirdParty {
@@ -765,7 +801,7 @@ func (ig *Igate) gateRFToIS(pkt *aprs.DecodedAPRSPacket) GateReason {
 		ig.mDroppedOffline.Inc()
 		return GateReasonOffline
 	}
-	line, err := encodeTNC2(pkt, ig.stationCallsign)
+	line, err := encodeTNC2(pkt, ig.stationCallsign, ig.qConstructFor(pkt))
 	if err != nil {
 		ig.logger.Debug("igate: encode tnc2 failed", "err", err)
 		return GateReasonEncodeFail
@@ -791,6 +827,49 @@ func (ig *Igate) gateRFToIS(pkt *aprs.DecodedAPRSPacket) GateReason {
 	return GateReasonGated
 }
 
+// qConstructFor advertises whether this particular RF sender is reachable
+// via our IS->RF message gateway. qAR is a promise of possible message
+// delivery, not merely proof that this host has a transmit-capable radio.
+// When reachability cannot be established, conservatively use qAO.
+func (ig *Igate) qConstructFor(pkt *aprs.DecodedAPRSPacket) string {
+	if pkt == nil || pkt.Source == "" || pkt.Channel <= 0 || !pathIsDirect(pkt.Path) {
+		return "qAO"
+	}
+
+	// The configured downlink can transmit only on its selected channel.
+	// In particular, hearing a station on LoRa does not make it reachable
+	// through an unrelated VHF AFSK downlink (or vice versa).
+	txChannel := ig.txChannel.Load()
+	if txChannel == 0 || uint32(pkt.Channel) != txChannel {
+		return "qAO"
+	}
+	ig.mu.Lock()
+	hasGovernor := ig.cfg.Governor != nil
+	ig.mu.Unlock()
+	if !hasGovernor {
+		return "qAO"
+	}
+	if ig.cfg.ChannelModes != nil {
+		mode, err := ig.cfg.ChannelModes.ModeForChannel(context.Background(), txChannel)
+		if err != nil || mode == configstore.ChannelModePacket {
+			return "qAO"
+		}
+	}
+
+	// An IS->RF filter with no matching message rule cannot deliver
+	// a reply. The sender of a future reply is unknown; checking an
+	// empty sender intentionally avoids making promises based only on
+	// an allowlist for some hypothetical Internet sender.
+	f := ig.filter.Load()
+	if f == nil || !f.Allow(&aprs.DecodedAPRSPacket{
+		Type:    aprs.PacketMessage,
+		Message: &aprs.Message{Addressee: pkt.Source},
+	}) {
+		return "qAO"
+	}
+	return "qAR"
+}
+
 func pathBlocksGating(path []string) bool {
 	for _, p := range path {
 		u := strings.ToUpper(strings.TrimSuffix(p, "*"))
@@ -808,6 +887,12 @@ func pathBlocksGating(path []string) bool {
 // beacon scheduler to duplicate a beacon to APRS-IS when the operator
 // has opted in. Returns an error if the igate is not connected.
 func (ig *Igate) SendLine(line string) error {
+	// Locally generated APRS-IS traffic bypasses gateRFToIS.
+	// The info portion starts after the first TNC2 ':' separator.
+	if colon := strings.IndexByte(line, ':'); colon >= 0 &&
+		aprs.IsDAPNETTraffic([]byte(line[colon+1:])) {
+		return errors.New("igate: DAPNET/POCSAG traffic blocked")
+	}
 	ig.mu.Lock()
 	connected := ig.connected
 	ig.mu.Unlock()
@@ -826,6 +911,19 @@ func (ig *Igate) SendLine(line string) error {
 // connection is closed so the supervisor reconnects with the new
 // filter (which is sent at login time). Pass a non-nil governor to
 // enable IS→RF gating, or nil to disable it.
+// SetRFToISBlocklist applies new callsign exclusions without restarting
+// the APRS-IS session. Values are validated by the REST handler before
+// they are persisted to the database.
+func (ig *Igate) SetRFToISBlocklist(value string) {
+	ig.rfToISBlocklist.Store(newRFToISBlocklist(value))
+}
+
+// SetRFToISEnabled changes RF→IS gating without touching the APRS-IS
+// receive connection or IS→RF messaging configuration.
+func (ig *Igate) SetRFToISEnabled(enabled bool) {
+	ig.rfToIsEnabled.Store(enabled)
+}
+
 func (ig *Igate) Reconfigure(serverFilter string, rules []filters.Rule, gov txgovernor.TxSink) {
 	ig.filter.Store(filters.New(rules))
 
@@ -892,6 +990,9 @@ func (ig *Igate) Status() Status {
 	ig.mu.Lock()
 	defer ig.mu.Unlock()
 	return Status{
+		RFToISEnabled:  ig.rfToIsEnabled.Load(),
+		TxChannel:      ig.txChannel.Load(),
+		IsToRFEnabled:  ig.cfg.Governor != nil,
 		Connected:      ig.connected,
 		Server:         ig.cfg.Server,
 		Callsign:       ig.stationCallsign,

@@ -275,7 +275,7 @@
   .action-cell .args {
     color: var(--text-muted);
     font-size: 12px;
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-sans);
   }
   .detail {
     background: none;

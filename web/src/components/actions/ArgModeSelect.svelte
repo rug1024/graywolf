@@ -46,7 +46,7 @@
     margin: 0.5rem 0 0;
   }
   .arg-mode__help code {
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-sans);
     background: var(--accent-bg, rgba(0, 0, 0, 0.05));
     padding: 1px 4px;
     border-radius: 3px;

@@ -8,12 +8,12 @@ import { toasts } from '../stores.js';
 const LS_KEY = 'units-system';
 
 function normalize(v) {
-  return v === 'metric' ? 'metric' : 'imperial';
+  return v === 'imperial' ? 'imperial' : 'metric';
 }
 
 function readStored() {
   try { return normalize(localStorage.getItem(LS_KEY)); }
-  catch { return 'imperial'; }
+  catch { return 'metric'; }
 }
 
 function writeStored(v) {

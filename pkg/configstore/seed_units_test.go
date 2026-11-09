@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestGetUnitsConfig_DefaultsToImperialWhenMissing(t *testing.T) {
+func TestGetUnitsConfig_DefaultsToMetricWhenMissing(t *testing.T) {
 	ctx := context.Background()
 	s := newTestStore(t)
 
@@ -16,8 +16,8 @@ func TestGetUnitsConfig_DefaultsToImperialWhenMissing(t *testing.T) {
 	if got.ID != 0 {
 		t.Fatalf("expected no row (ID=0), got %+v", got)
 	}
-	if got.System != "imperial" {
-		t.Fatalf("expected System=imperial on fresh install, got %+v", got)
+	if got.System != "metric" {
+		t.Fatalf("expected System=metric on fresh install, got %+v", got)
 	}
 }
 
@@ -85,7 +85,7 @@ func TestGetUnitsConfig_NormalizesUnknownStoredValue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUnitsConfig: %v", err)
 	}
-	if got.System != "imperial" {
-		t.Fatalf("expected fallback to imperial, got %+v", got)
+	if got.System != "metric" {
+		t.Fatalf("expected fallback to metric, got %+v", got)
 	}
 }

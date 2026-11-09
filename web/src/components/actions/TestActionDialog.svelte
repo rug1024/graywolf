@@ -342,7 +342,7 @@
     color: var(--color-text-dim, var(--text-muted));
   }
   .value {
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-sans);
     font-size: 12px;
   }
   .block {
@@ -350,7 +350,7 @@
     padding: 8px 10px;
     background: var(--bg-tertiary, rgba(0, 0, 0, 0.04));
     border-radius: 4px;
-    font-family: ui-monospace, monospace;
+    font-family: var(--font-sans);
     font-size: 12px;
     white-space: pre-wrap;
     word-break: break-word;

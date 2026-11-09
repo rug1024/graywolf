@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from 'svelte';
-  import { Button, Input, Select, Badge, Checkbox, Toggle } from '@chrissnell/chonky-ui';
-  import { api, kissBt, kissUsb, kissSerial } from '../lib/api.js';
+  import { Button, Input, Select, Badge, Checkbox, Toggle, Tooltip } from '@chrissnell/chonky-ui';
+  import { api, kissBt, kissUsb, kissSerial, kissBle } from '../lib/api.js';
   import { Platform } from '../lib/platform.js';
   import { toasts } from '../lib/stores.js';
   import PageHeader from '../components/PageHeader.svelte';
@@ -83,8 +83,13 @@
   // toggle cell gets vertical-align:middle so the switch centers in the row
   // instead of sitting on the baseline.
   const BADGE_HEAD_INDENT = 'padding-left: calc(0.4rem + 1px);';
+  // chonky-ui td has padding-right: 0.75rem but padding-left: 0; mirror the
+  // right side on the first column so the Type badge isn't flush to the edge.
+  const FIRST_COL_PAD = '0.75rem';
   const columns = [
-    { key: 'type', label: 'Type', headStyle: BADGE_HEAD_INDENT },
+    { key: 'type', label: 'Type',
+      tdStyle: `padding-left: ${FIRST_COL_PAD};`,
+      headStyle: `padding-left: calc(${FIRST_COL_PAD} + 0.4rem + 1px);` },
     { key: 'endpoint', label: 'Endpoint' },
     { key: 'channel', label: 'Channel' },
     { key: 'mode', label: 'Mode', headStyle: BADGE_HEAD_INDENT },
@@ -105,15 +110,17 @@
   // menu re-derives if the JS bridge appears/disappears mid-session
   // (rare, but the reactive shape costs us nothing).
   const desktopTypeOptions = [
-    { value: 'tcp',        label: 'TCP (server)' },
-    { value: 'tcp-client', label: 'TCP Client' },
-    { value: 'serial',     label: 'Serial' },
+    { value: 'tcp',            label: 'TCP (server)' },
+    { value: 'tcp-client',    label: 'TCP Client' },
+    { value: 'serial',        label: 'Serial' },
+    { value: 'ble-device', label: 'BLE TNC Devices' },
   ];
   const androidTypeOptions = [
-    { value: 'bluetooth',  label: 'Bluetooth Serial' },
-    { value: 'usbserial',  label: 'USB Serial' },
-    { value: 'tcp',        label: 'TCP (server)' },
-    { value: 'tcp-client', label: 'Network' },
+    { value: 'bluetooth',     label: 'Bluetooth Serial' },
+    { value: 'ble-device', label: 'BLE TNC Devices' },
+    { value: 'usbserial',     label: 'USB Serial' },
+    { value: 'tcp',           label: 'TCP (server)' },
+    { value: 'tcp-client',    label: 'Network' },
   ];
   let typeOptions = $derived(Platform.isAndroid ? androidTypeOptions : desktopTypeOptions);
 
@@ -123,11 +130,33 @@
   let bondedDevices = $state([]);
   let bondedLoading = $state(false);
   let bondedError = $state('');
+
+  // BLE TNC device scanner. Auto-starts when the modal opens with
+  // type=ble-device and stops on modal close or type change.
+  // bleSource is the active EventSource (null when not scanning).
+  let bleDevices = $state([]);
+  let bleScanning = $state(false);
+  let bleError = $state('');
+  let bleSource = $state(null);
+
+  let bleDeviceOptions = $derived(
+    bleDevices.map((d) => ({
+      value: d.addr,
+      label: d.name ? `${d.name} (${d.addr})` : d.addr,
+    }))
+  );
+
+  // Inline save-time error for the BLE device picker.
+  let bleSaveError = $state('');
   // Inline save-time validation error. Surfaced via the bonded-device
   // FormField's `error` prop alongside any network error from the
   // lazy loader. Cleared whenever the operator picks a device or the
   // modal reopens.
   let saveError = $state('');
+  // Server-side failure from the last Create/Save, shown above the modal
+  // buttons. The toast alone is easy to miss on a tablet, where the modal
+  // then just stays open with no visible reason (GH #573).
+  let submitError = $state('');
 
   // Derived <Select> options for the bonded-device picker. chonky-ui's
   // Select doesn't honor `disabled` on individual options (it only
@@ -358,6 +387,7 @@
   onDestroy(() => {
     if (pollTimer) clearInterval(pollTimer);
     if (clockTimer) clearInterval(clockTimer);
+    stopBLEScan();
   });
 
   function openCreate() {
@@ -372,6 +402,7 @@
       form.type = 'bluetooth';
     }
     saveError = '';
+    submitError = '';
     // Default AllowTxFromGovernor=true for new tcp-client rows per
     // plan D4. When the operator flips to tcp-client we pre-check
     // the governor-TX checkbox so the common case (outbound TNC for
@@ -382,6 +413,7 @@
   function openEdit(row) {
     editing = row;
     saveError = '';
+    submitError = '';
     form = {
       ...row,
       tcp_port: String(row.tcp_port ?? ''),
@@ -431,9 +463,18 @@
   // type to bluetooth so the Mode-gated UI (rate/burst, governor-TX
   // checkbox) renders, and so buildPayload() doesn't try to send
   // mode=modem to a server that would reject it.
+  // ble-device also always forces tnc for the same reason.
   $effect(() => {
-    if (form.type === 'bluetooth' && form.mode !== 'tnc') {
+    if ((form.type === 'bluetooth' || form.type === 'ble-device') && form.mode !== 'tnc') {
       form.mode = 'tnc';
+    }
+  });
+
+  // Stop any in-progress BLE scan when the modal closes or the type changes
+  // away from ble-device. Scan is started manually via the Scan button.
+  $effect(() => {
+    if (form.type !== 'ble-device' || !modalOpen) {
+      stopBLEScan();
     }
   });
 
@@ -444,15 +485,28 @@
   // Platform.isAndroid: on desktop the GET returns 501 by design, so
   // we short-circuit with a friendly message instead of letting the
   // operator stare at "HTTP 501".
+  //
+  // Auto-load at most once per modal open. Without this latch an empty
+  // result (nothing paired, or BLUETOOTH_CONNECT not granted) re-satisfies
+  // the gate the moment bondedLoading drops, so the effect refetches in a
+  // tight loop: the picker sits on "Loading…", Refresh stays disabled and
+  // the "Grant Bluetooth permission" button never renders (GH #573).
+  // Plain (non-$state) on purpose: the latch must not retrigger the effect.
+  let bondedAutoLoaded = false;
   $effect(() => {
-    if (form.type !== 'bluetooth' || !modalOpen) return;
+    if (!modalOpen) {
+      bondedAutoLoaded = false;
+      return;
+    }
+    if (form.type !== 'bluetooth') return;
     if (!Platform.isAndroid) {
       if (!bondedError) {
         bondedError = 'Bluetooth interfaces can only be configured from the Android app.';
       }
       return;
     }
-    if (bondedDevices.length === 0 && !bondedLoading && !bondedError) {
+    if (!bondedAutoLoaded && bondedDevices.length === 0 && !bondedLoading && !bondedError) {
+      bondedAutoLoaded = true;
       loadBondedDevices();
     }
   });
@@ -470,9 +524,78 @@
     }
   }
 
-  // Phase 6 (Option A scope): prompt the operator to grant
-  // BLUETOOTH_CONNECT via the Android JS bridge, then re-poll the
-  // bonded-device list on success. The lambda is wired through
+  // startBLEScan opens an SSE stream to /api/kiss/ble-device-scan.
+  // On Android 12+ the native BLE scanner requires the Nearby devices
+  // runtime permission (BLUETOOTH_SCAN); use the same bridge as classic
+  // Bluetooth before opening the SSE stream. MainActivity short-circuits
+  // immediately when the permission is already granted.
+  function startBLEScan() {
+    if (Platform.isAndroid && globalThis.GraywolfWebInterface?.requestBluetoothPermission) {
+      requestBtPerm(
+        openBLEScan,
+        () => { bleError = 'Nearby devices permission is required to scan for BLE TNCs.'; },
+      );
+      return;
+    }
+    openBLEScan();
+  }
+
+  function openBLEScan() {
+    stopBLEScan(); // close any lingering source first
+    bleDevices = [];
+    bleError = '';
+    bleSaveError = '';
+    // Do not clear form.serial_device here — preserve a device the
+    // operator already selected from a previous scan.
+    bleScanning = true;
+
+    const source = kissBle.openScan();
+    bleSource = source;
+
+    source.onmessage = (e) => {
+      try {
+        const dev = JSON.parse(e.data);
+        // Deduplicate in case the server sends the same addr twice.
+        if (!bleDevices.some((d) => d.addr === dev.addr)) {
+          bleDevices = [...bleDevices, dev];
+        }
+      } catch {
+        // malformed JSON from server — ignore
+      }
+    };
+
+    source.addEventListener('done', () => {
+      bleScanning = false;
+      bleSource = null;
+      source.close();
+    });
+
+    source.addEventListener('error', (e) => {
+      // SSE "error" event carries a plain text message in e.data.
+      bleError = e.data || 'BLE scan failed';
+      stopBLEScan();
+    });
+
+    source.onerror = () => {
+      // Connection dropped (e.g. server returned 501 / 409).
+      if (bleScanning) {
+        bleError = 'BLE scan unavailable — this build may not include BLE support.';
+      }
+      stopBLEScan();
+    };
+  }
+
+  function stopBLEScan() {
+    if (bleSource) {
+      bleSource.close();
+      bleSource = null;
+    }
+    bleScanning = false;
+  }
+
+  // Ask Android for the Nearby devices permissions used by both Bluetooth
+  // Classic and BLE (BLUETOOTH_CONNECT + BLUETOOTH_SCAN on Android 12+),
+  // then run the requested action on success. The lambda is wired through
   // MainActivity (which owns requestPermissions()); the WebAppInterface
   // method exists only on Android, so the optional-chain on
   // window.GraywolfWebInterface is the desktop guard.
@@ -488,8 +611,11 @@
   // That would require a new state on the backend response and a
   // signal up through the supervisor; it's deferred as a future
   // enhancement.
-  function requestBtPerm() {
-    if (!Platform.isAndroid) return;
+  function requestBtPerm(onGranted = loadBondedDevices, onDenied = undefined) {
+    if (!Platform.isAndroid) {
+      onGranted?.();
+      return;
+    }
     if (!globalThis.GraywolfWebInterface?.requestBluetoothPermission) return;
     // Prefix guarantees a non-empty alphanumeric id even if Math.random()
     // returns 0 — same callback-id pattern the Android USB-grant flow uses.
@@ -498,10 +624,11 @@
     globalThis.__btResult = (id, granted) => {
       if (id !== callbackId) return;
       // One-shot: restore (or clear) the previous handler so a stale
-      // callback fired after we tear down can't refire loadBondedDevices.
+      // callback fired after we tear down can't trigger the wrong action.
       if (prev) globalThis.__btResult = prev;
       else delete globalThis.__btResult;
-      if (granted) loadBondedDevices();
+      if (granted) onGranted?.();
+      else onDenied?.();
     };
     try {
       globalThis.GraywolfWebInterface.requestBluetoothPermission(callbackId);
@@ -518,15 +645,23 @@
   // opens the modal with the "usbserial" type selected. Mirrors the
   // bluetooth lazy-loader pattern above. Gated on Platform.isAndroid:
   // desktop returns 501, so we short-circuit with a friendly message.
+  // Latched once per modal open for the same reason as bondedAutoLoaded:
+  // nothing plugged in is a legitimate empty result.
+  let usbAutoLoaded = false;
   $effect(() => {
-    if (form.type !== 'usbserial' || !modalOpen) return;
+    if (!modalOpen) {
+      usbAutoLoaded = false;
+      return;
+    }
+    if (form.type !== 'usbserial') return;
     if (!Platform.isAndroid) {
       if (!usbError) {
         usbError = 'USB serial interfaces can only be configured from the Android app.';
       }
       return;
     }
-    if (usbDevices.length === 0 && !usbLoading && !usbError) {
+    if (!usbAutoLoaded && usbDevices.length === 0 && !usbLoading && !usbError) {
+      usbAutoLoaded = true;
       loadUsbDevices();
     }
   });
@@ -547,11 +682,18 @@
   // Lazy-load host serial ports the first time the operator opens the modal
   // with the "serial" type selected. Unlike bluetooth/usbserial this works
   // on every desktop platform (the ports are enumerated on the host running
-  // graywolf), so there's no Platform gate. Re-runs only when the gate flips
-  // back to satisfied — the operator can clear an error and click Refresh.
+  // graywolf), so there's no Platform gate. Latched once per modal open
+  // like bondedAutoLoaded (a host with no serial ports is a legitimate
+  // empty result); the operator retries with Refresh.
+  let serialPortsAutoLoaded = false;
   $effect(() => {
-    if (form.type !== 'serial' || !modalOpen) return;
-    if (serialPorts.length === 0 && !serialPortsLoading && !serialPortsError) {
+    if (!modalOpen) {
+      serialPortsAutoLoaded = false;
+      return;
+    }
+    if (form.type !== 'serial') return;
+    if (!serialPortsAutoLoaded && serialPorts.length === 0 && !serialPortsLoading && !serialPortsError) {
+      serialPortsAutoLoaded = true;
       loadSerialPorts();
     }
   });
@@ -681,6 +823,11 @@
         data.serial_device = form.serial_device || '';
         data.baud_rate = parseInt(form.baud_rate) || 9600;
         break;
+      case 'ble-device':
+        // BLE address stored in serial_device; no baud rate.
+        data.serial_device = form.serial_device || '';
+        data.baud_rate = 0;
+        break;
     }
     return data;
   }
@@ -699,6 +846,7 @@
       await refreshItems();
       refreshChannels();
     } catch (err) {
+      submitError = err.message;
       toasts.error(err.message);
     }
   }
@@ -718,7 +866,13 @@
       saveError = 'Pick a USB serial device before saving.';
       return;
     }
+    if (form.type === 'ble-device' && !form.serial_device) {
+      bleSaveError = 'Scan and select a device before saving.';
+      return;
+    }
+    bleSaveError = '';
     saveError = '';
+    submitError = '';
     // Mode changes on an existing interface take effect the instant the
     // server restarts the per-interface KISS server — connected peers see
     // routing behavior flip under them. Make the operator confirm it.
@@ -737,12 +891,13 @@
   // server-side type we don't recognize yet.
   function labelForType(t) {
     switch (t) {
-      case 'tcp':        return 'TCP (server)';
-      case 'tcp-client': return Platform.isAndroid ? 'Network' : 'TCP Client';
-      case 'serial':     return 'Serial';
-      case 'bluetooth':  return 'Bluetooth Serial';
-      case 'usbserial':  return 'USB Serial';
-      default:           return t;
+      case 'tcp':            return 'TCP (server)';
+      case 'tcp-client':     return Platform.isAndroid ? 'Network' : 'TCP Client';
+      case 'serial':         return 'Serial';
+      case 'bluetooth':      return 'Bluetooth Serial';
+      case 'usbserial':      return 'USB Serial';
+      case 'ble-device':      return 'BLE TNC';
+      default:               return t;
     }
   }
 
@@ -786,13 +941,49 @@
     if (row.type === 'serial') return row.serial_device || '—';
     if (row.type === 'bluetooth') return friendlyDevice(row) || '—';
     if (row.type === 'usbserial') return row.serial_device || '—';
+    if (row.type === 'ble-device') {
+      // Show friendly name if the device was discovered in this session.
+      const dev = bleDevices.find((d) => d.addr === (row.serial_device || row.device));
+      const addr = row.serial_device || row.device || '';
+      return dev ? `${dev.name} (${addr})` : addr || '—';
+    }
     return '—';
   }
+
+  // Re-Pair confirmation state.
+  let repairConfirmOpen = $state(false);
+  let repairConfirmMessage = $state('');
+  let pendingRepairId = $state(null);
+  // IDs whose bond has already been removed this session.
+  const repairedBleIds = new Set();
 
   function handleDelete(row) {
     pendingDeleteId = row.id;
     confirmMessage = `Delete KISS interface (${describeRow(row)}) on channel ${row.channel}?`;
     confirmOpen = true;
+  }
+
+  function handleRepairBle(row) {
+    if (repairedBleIds.has(row.id)) {
+      toasts.info('This device is already ready to be re-paired');
+      return;
+    }
+    pendingRepairId = row.id;
+    repairConfirmMessage = `Remove the Bluetooth bond for "${row.name || endpointText(row)}"? This will un-pair the device and prompt for a new pairing on the next connection. This will allow you to re-pair the device after connecting to another application on the same host.`;
+    repairConfirmOpen = true;
+  }
+
+  async function confirmRepairBle() {
+    const id = pendingRepairId;
+    pendingRepairId = null;
+    if (id == null) return;
+    try {
+      await api.post(`/kiss/${id}/repairble`, null);
+      repairedBleIds.add(id);
+      toasts.success('Bond removed — re-enable the interface to trigger fresh pairing');
+    } catch (err) {
+      toasts.error(err.message);
+    }
   }
 
   async function confirmDelete() {
@@ -854,6 +1045,12 @@
   function healthClass(state) {
     return (state === 'connected' || state === 'listening') ? 'health-live' : 'health-down';
   }
+
+  // True when the channel assigned to this KISS interface is disabled.
+  function isChannelDisabled(row) {
+    const ch = channels.find((c) => c.id === row.channel);
+    return ch?.enabled === false;
+  }
 </script>
 
 <PageHeader title="KISS Interfaces" subtitle="KISS interface configuration">
@@ -888,6 +1085,13 @@
   rows={items}
   onEdit={openEdit}
   onDelete={handleDelete}
+  extraActions={[{
+    title: 'Re-Pair',
+    variant: 'primary',
+    show: (row) => row.type === 'ble-device',
+    disabled: (row) => row.enabled !== false,
+    onClick: handleRepairBle,
+  }]}
   cells={{ type: typeCell, endpoint: endpointCell, mode: modeCell, status: statusCell, enabled: enabledCell }}
 />
 
@@ -906,6 +1110,8 @@
     <Badge variant="info">{labelForType(value)}</Badge>
   {:else if value === 'serial'}
     <Badge>{labelForType(value)}</Badge>
+  {:else if value === 'ble-device'}
+    <Badge variant="success">{labelForType(value)}</Badge>
   {:else}
     <Badge>{value || '—'}</Badge>
   {/if}
@@ -917,12 +1123,13 @@
 
 {#snippet statusCell(_value, row)}
   {@const disabled = row.enabled === false}
+  {@const channelDisabled = isChannelDisabled(row)}
   <!-- Only tcp-client rows carry live connection diagnostics worth an
        expandable panel (peer, reconnect count, backoff, last error,
        Retry now). For server / serial / disabled rows the status is a
        plain badge — the old expand popped a gray box that just echoed
        the Endpoint column and buried the disable action (GRA-85). -->
-  {@const expandable = !disabled && row.type === 'tcp-client'}
+  {@const expandable = !disabled && !channelDisabled && row.type === 'tcp-client'}
   <div class="status-cell" data-tick={clockTick}>
     <!-- clockTick is in data-tick so any change triggers snippet
          re-render; that propagates to the countdownText call below. -->
@@ -932,6 +1139,13 @@
       <span class="status-static">
         <span class="health-disabled" aria-hidden="true">○</span>
         <Badge>Disabled</Badge>
+      </span>
+    {:else if channelDisabled}
+      <!-- The assigned channel is disabled, so this interface cannot
+           run regardless of its own enabled flag. -->
+      <span class="status-static">
+        <span class="health-disabled" aria-hidden="true">○</span>
+        <Badge>Channel disabled</Badge>
       </span>
     {:else if expandable}
       <button
@@ -978,15 +1192,29 @@
   <!-- Dedicated enable/disable toggle (GRA-85). Disabling stops the
        supervisor and releases the device; enabling restarts it. The
        saved config is preserved either way. -->
-  <Toggle
-    checked={row.enabled !== false}
-    onCheckedChange={() => handleToggleEnabled(row)}
-    aria-label={`${row.enabled === false ? 'Enable' : 'Disable'} KISS interface ${row.id}`}
-  />
+  {@const channelDisabled = isChannelDisabled(row)}
+  {#if channelDisabled}
+    <Tooltip.Root>
+      <Tooltip.Trigger class="tooltip-trigger-plain">
+        <Toggle
+          checked={row.enabled !== false}
+          disabled={true}
+          aria-label={`KISS interface ${row.id} cannot be enabled — assigned channel is disabled`}
+        />
+      </Tooltip.Trigger>
+      <Tooltip.Content side="top">Enable the assigned channel first</Tooltip.Content>
+    </Tooltip.Root>
+  {:else}
+    <Toggle
+      checked={row.enabled !== false}
+      onCheckedChange={() => handleToggleEnabled(row)}
+      aria-label={`${row.enabled === false ? 'Enable' : 'Disable'} KISS interface ${row.id}`}
+    />
+  {/if}
 {/snippet}
 
 <Modal bind:open={modalOpen} title={editing ? 'Edit KISS' : 'New KISS Interface'}>
-    {#if form.type !== 'bluetooth'}
+    {#if form.type !== 'bluetooth' && form.type !== 'ble-device'}
       <FormField label="Mode" id="kiss-mode" hint={modeHint}>
         {#snippet children(describedBy)}
           <Select id="kiss-mode" bind:value={form.mode} options={modeOptions} aria-describedby={describedBy} />
@@ -1104,6 +1332,38 @@
       >
         <Select id="kiss-usb-baud" bind:value={form.baud_rate} options={baudRateOptions} />
       </FormField>
+    {:else if form.type === 'ble-device'}
+      <!-- BLE scan starts explicitly from the Scan button; devices appear in
+           the picker in real time as the platform BLE backend discovers them. -->
+      <FormField
+        label="Device"
+        id="kiss-ble-device"
+        hint="Nearby BLE TNC devices (Mobilinkd TNC3/TNC4, BTECH UV-PRO, VERO VR-N76, Radioddity GA-5WB, and others). Power on the TNC before scanning."
+        error={bleSaveError || bleError}
+      >
+        {#snippet children(describedBy)}
+          <div class="bt-picker">
+            <Select
+              id="kiss-ble-device"
+              bind:value={form.serial_device}
+              options={bleDeviceOptions}
+              placeholder={bleScanning ? 'Scanning…' : (bleDevices.length === 0 ? 'Click Scan to find devices' : 'Select a device')}
+              onValueChange={() => { bleSaveError = ''; }}
+              aria-describedby={describedBy}
+            />
+            {#if bleScanning}
+              <Button variant="secondary" onclick={stopBLEScan}>Stop</Button>
+            {:else}
+              <Button variant="secondary" onclick={startBLEScan}>Scan</Button>
+            {/if}
+          </div>
+          {#if bleScanning}
+            <p class="field-hint">Scanning for BLE TNC devices — devices appear as they are found…</p>
+          {:else if bleDevices.length === 0 && !bleError}
+            <p class="field-hint">Power on the TNC and click Scan. Supported devices (Mobilinkd TNC3/TNC4, BTECH UV-PRO, VERO VR-N76, Radioddity GA-5WB) appear in the picker as they are discovered.</p>
+          {/if}
+        {/snippet}
+      </FormField>
     {:else if form.type === 'serial'}
       <FormField
         label="Detected ports"
@@ -1140,7 +1400,13 @@
         <Select id="kiss-baud" bind:value={form.baud_rate} options={baudRateOptions} />
       </FormField>
     {/if}
-    <FormField label="Channel" id="kiss-channel">
+    <FormField
+      label="Channel"
+      id="kiss-channel"
+      hint={channels.length === 0
+        ? 'No channels exist yet, so Create will fail. Add one first under Settings → Channels (pick "KISS-TNC only" for a radio\'s built-in TNC), then come back.'
+        : ''}
+    >
       {#if channels.length > 0}
         <ChannelListbox
           id="kiss-channel"
@@ -1223,11 +1489,23 @@
         {/if}
       </div>
     {/if}
+    {#if submitError}
+      <p class="submit-error" role="alert">{submitError}</p>
+    {/if}
     <div class="modal-actions">
       <Button onclick={() => modalOpen = false}>Cancel</Button>
       <Button variant="primary" onclick={handleSave}>{editing ? 'Save' : 'Create'}</Button>
     </div>
 </Modal>
+
+<ConfirmDialog
+  bind:open={repairConfirmOpen}
+  title="Re-Pair BLE Device"
+  message={repairConfirmMessage}
+  confirmLabel="Re-Pair"
+  confirmVariant="primary"
+  onConfirm={confirmRepairBle}
+/>
 
 <ConfirmDialog
   bind:open={confirmOpen}
@@ -1261,6 +1539,7 @@
   }
 
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+  .submit-error { color: var(--color-danger, #d32f2f); margin: 16px 0 0; font-size: 13px; }
   .checkbox-field {
     display: flex;
     flex-direction: column;
@@ -1337,6 +1616,15 @@
   .health-live { color: var(--color-success, #4caf50); font-size: 14px; }
   .health-down { color: var(--color-warning, #ffa000); font-size: 14px; }
   .health-disabled { color: var(--text-secondary, #9e9e9e); font-size: 14px; }
+  /* Strip the default <button> chrome that Tooltip.Trigger adds */
+  :global(.tooltip-trigger-plain) {
+    background: none;
+    border: none;
+    padding: 0;
+    margin: 0;
+    display: inline-flex;
+    cursor: default;
+  }
   .countdown {
     font-size: 12px;
     color: var(--text-secondary);
@@ -1394,11 +1682,29 @@
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
   }
   .bt-picker :global(select),
   .bt-picker :global(input) {
     margin: 0 !important;
     flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* On narrow phones the device name/MAC in the BLE picker can be much
+     wider than the available modal width. Stack the picker and action button
+     instead of allowing the row to push the modal past the viewport. */
+  @media (max-width: 480px) {
+    .bt-picker {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .bt-picker :global(button) {
+      width: 100%;
+    }
+    .needs-reconfig-banner {
+      flex-wrap: wrap;
+    }
   }
   /* Grant-permission button row sits below the bt-picker; the small
      top margin separates it from the picker without making the

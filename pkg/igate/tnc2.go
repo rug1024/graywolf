@@ -1,6 +1,7 @@
 package igate
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,20 +11,31 @@ import (
 )
 
 // encodeTNC2 renders a decoded APRS packet as a TNC2-monitor line suitable
-// for APRS-IS uplink, WITHOUT the trailing CRLF. The path has its
-// trailing `*` H-bit markers stripped and a `,qAR,IGATECALL` construct
-// appended (APRS-IS convention identifying the gating station).
+// for APRS-IS uplink, WITHOUT the trailing CRLF. The RF path is
+// preserved verbatim, including repeated-digipeater `*` markers; only
+// a `,qAR,IGATECALL` or `,qAO,IGATECALL` construct is appended. This is
+// required by the APRS-IS IGate specification.
 // Wire-format glue is delegated to aprs.FormatTNC2 so this encoder
 // shares structural rules with the originating-side encoder in
 // pkg/messages.
-func encodeTNC2(pkt *aprs.DecodedAPRSPacket, igateCall string) (string, error) {
+func encodeTNC2(pkt *aprs.DecodedAPRSPacket, igateCall, qConstruct string) (string, error) {
 	if pkt == nil {
 		return "", errors.New("igate: nil packet")
 	}
 	if pkt.Source == "" || pkt.Dest == "" {
 		return "", errors.New("igate: packet missing source or dest")
 	}
+	if qConstruct != "qAR" && qConstruct != "qAO" {
+		return "", fmt.Errorf("igate: unsupported q construct %q", qConstruct)
+	}
+	// APRS-IS is line-oriented: CR or LF inside RF payload would split
+	// one packet into multiple TCP records. Only the outgoing record
+	// is sanitized; the received AX.25 frame and its logging stay intact.
+	// This ports PR #10 onto the qAO/qAR + H-bit preserving iGate path.
 	info := infoBytes(pkt)
+	if cut := bytes.IndexAny(info, "\r\n"); cut >= 0 {
+		info = info[:cut]
+	}
 	if len(info) == 0 {
 		return "", errors.New("igate: packet has no info field")
 	}
@@ -32,9 +44,9 @@ func encodeTNC2(pkt *aprs.DecodedAPRSPacket, igateCall string) (string, error) {
 		if p == "" {
 			continue
 		}
-		path = append(path, strings.TrimSuffix(p, "*"))
+		path = append(path, p)
 	}
-	path = append(path, "qAR", igateCall)
+	path = append(path, qConstruct, igateCall)
 	return aprs.FormatTNC2(pkt.Source, pkt.Dest, path, info), nil
 }
 
